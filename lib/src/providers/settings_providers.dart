@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/settings_repository.dart';
+import '../l10n/app_strings.dart';
 
 /// Bound to the concrete repository in `main` via a ProviderScope override,
 /// mirroring [knowledgeRepositoryProvider].
@@ -31,3 +32,20 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
 
 final themeModeProvider =
     NotifierProvider<ThemeModeNotifier, ThemeMode>(ThemeModeNotifier.new);
+
+/// Interface language, persisted in the settings box (English by default).
+class LanguageNotifier extends Notifier<AppLanguage> {
+  SettingsRepository get _settings => ref.read(settingsRepositoryProvider);
+
+  @override
+  AppLanguage build() =>
+      AppLanguage.fromCode(_settings.getString(SettingsRepository.kLanguage));
+
+  Future<void> set(AppLanguage language) async {
+    state = language;
+    await _settings.setString(SettingsRepository.kLanguage, language.name);
+  }
+}
+
+final languageProvider =
+    NotifierProvider<LanguageNotifier, AppLanguage>(LanguageNotifier.new);

@@ -11,6 +11,7 @@ class SettingsRepository {
 
   // Keys.
   static const String kThemeMode = 'themeMode';
+  static const String kLanguage = 'language';
   static const String kGeminiApiKey = 'geminiApiKey';
   static const String kGeminiModel = 'geminiModel';
   static const String kTelegramBotToken = 'telegramBotToken';

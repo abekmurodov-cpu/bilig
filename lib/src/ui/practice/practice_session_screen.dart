@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:flutter/foundation.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../llm/llm_providers.dart';
 import '../../models/knowledge_item.dart';
 import '../../practice/answer_matching.dart';
@@ -289,8 +290,8 @@ class _PracticeSessionScreenState
     return Scaffold(
       appBar: AppBar(
         title: Text(done
-            ? 'Done'
-            : '${widget.config.method.label}  ${_index + 1}/${_queue.length}'),
+            ? context.s.done
+            : '${context.s.methodLabel(widget.config.method)}  ${_index + 1}/${_queue.length}'),
       ),
       body: done ? _buildDone() : _buildBody(),
     );
@@ -321,7 +322,7 @@ class _PracticeSessionScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(_item.type.label.toUpperCase(),
+            Text(context.s.noteType(_item.type).toUpperCase(),
                 style: theme.textTheme.labelSmall
                     ?.copyWith(letterSpacing: 1.2)),
             const SizedBox(height: 12),
@@ -363,24 +364,24 @@ class _PracticeSessionScreenState
                         }
                       },
                       front: _cardFace(
-                        _item.type.label.toUpperCase(),
+                        context.s.noteType(_item.type).toUpperCase(),
                         _item.practicePrompt,
                         withImage: _item.hasImage,
                       ),
                       back: _cardFace(
-                        'ANSWER',
-                        _revealAnswer ?? '(no answer recorded yet)',
+                        context.s.answerLabel,
+                        _revealAnswer ?? context.s.noAnswerRecorded,
                       ),
                     ),
                     const SizedBox(height: 14),
                     Text(
                       viewOnly
                           ? (pastGrade == null
-                              ? 'Skipped · view only'
-                              : 'You rated it "${pastGrade.label}" · view only')
+                              ? context.s.skippedViewOnly
+                              : context.s.ratedViewOnly(pastGrade))
                           : showGrades
-                              ? 'How well did you recall it?'
-                              : 'Tap the card to flip',
+                              ? context.s.howWell
+                              : context.s.tapToFlip,
                       style: theme.textTheme.bodySmall,
                     ),
                   ],
@@ -400,7 +401,7 @@ class _PracticeSessionScreenState
                           padding: const EdgeInsets.symmetric(horizontal: 4),
                           child: OutlinedButton(
                             onPressed: () => _grade(grade),
-                            child: Text(grade.label),
+                            child: Text(context.s.grade(grade)),
                           ),
                         ),
                       ),
@@ -415,14 +416,14 @@ class _PracticeSessionScreenState
               TextButton.icon(
                 onPressed: _index > 0 ? () => _goToCard(_index - 1) : null,
                 icon: const Icon(Icons.chevron_left),
-                label: const Text('Previous'),
+                label: Text(context.s.previous),
               ),
               const Spacer(),
               TextButton.icon(
                 onPressed: () => _goToCard(_index + 1),
                 iconAlignment: IconAlignment.end,
                 icon: const Icon(Icons.chevron_right),
-                label: Text(_index + 1 >= _queue.length ? 'Finish' : 'Next'),
+                label: Text(_index + 1 >= _queue.length ? context.s.finish : context.s.next),
               ),
             ],
           ),
@@ -500,8 +501,8 @@ class _PracticeSessionScreenState
                     enabled: !answered,
                     minLines: 1,
                     maxLines: 4,
-                    decoration: const InputDecoration(
-                      labelText: 'Your answer',
+                    decoration: InputDecoration(
+                      labelText: context.s.yourAnswer,
                       border: OutlineInputBorder(),
                     ),
                     onSubmitted: answered ? null : (_) => _checkTyped(),
@@ -519,7 +520,7 @@ class _PracticeSessionScreenState
             child: answered
                 ? FilledButton(
                     onPressed: _advance,
-                    child: Text(_index + 1 >= _queue.length ? 'Finish' : 'Next'),
+                    child: Text(_index + 1 >= _queue.length ? context.s.finish : context.s.next),
                   )
                 : FilledButton(
                     onPressed: (_grading || _preparing) ? null : _checkTyped,
@@ -528,7 +529,7 @@ class _PracticeSessionScreenState
                             width: 18,
                             height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Text('Check'),
+                        : Text(context.s.check),
                   ),
           ),
         ),
@@ -580,13 +581,13 @@ class _PracticeSessionScreenState
               children: [
                 Icon(correct ? Icons.check_circle : Icons.cancel, color: color),
                 const SizedBox(width: 8),
-                Text(correct ? 'Correct' : 'Incorrect',
+                Text(correct ? context.s.correct : context.s.incorrect,
                     style: TextStyle(
                         color: color, fontWeight: FontWeight.bold)),
               ],
             ),
             const SizedBox(height: 8),
-            Text('Answer: ${_revealAnswer ?? _correctOption ?? '—'}'),
+            Text(context.s.answerIs(_revealAnswer ?? _correctOption ?? '—')),
             if (_feedback != null) ...[
               const SizedBox(height: 4),
               Text(_feedback!, style: const TextStyle(fontSize: 13)),
@@ -604,7 +605,7 @@ class _PracticeSessionScreenState
         width: double.infinity,
         child: FilledButton(
           onPressed: _advance,
-          child: Text(_index + 1 >= widget.queue.length ? 'Finish' : 'Next'),
+          child: Text(_index + 1 >= widget.queue.length ? context.s.finish : context.s.next),
         ),
       ),
     );
@@ -616,16 +617,17 @@ class _PracticeSessionScreenState
     // The prompt (front) describes what to write; the reference code is in back.
     final task = _item.front.trim().isNotEmpty
         ? _item.front
-        : 'Reproduce this code snippet from memory.';
+        : context.s.reproduceSnippet;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        _codeTaskHeader('Write the code', task),
+        _codeTaskHeader(
+            context.s.methodLabel(PracticeMethod.codeSnippet), task),
         const SizedBox(height: 12),
         CodeField(
           controller: _codeController,
           enabled: !answered,
-          hintText: 'Write your code here…  (Tab indents)',
+          hintText: context.s.writeCodeHint,
           minLines: 6,
           maxLines: 18,
         ),
@@ -638,7 +640,7 @@ class _PracticeSessionScreenState
                     width: 18,
                     height: 18,
                     child: CircularProgressIndicator(strokeWidth: 2))
-                : const Text('Check'),
+                : Text(context.s.check),
           )
         else ...[
           _resultBanner(),
@@ -652,6 +654,7 @@ class _PracticeSessionScreenState
   }
 
   Future<void> _checkCode() async {
+    final strings = context.s;
     final submitted = _codeController.text;
     if (submitted.trim().isEmpty) return;
     final reference = _item.back ?? '';
@@ -666,14 +669,13 @@ class _PracticeSessionScreenState
         feedback = g.feedback;
       } catch (_) {
         correct = codeMatches(submitted, reference);
-        feedback = 'AI check failed; used a whitespace-insensitive match.';
+        feedback = strings.aiCheckFailed;
       }
     } else {
       correct = codeMatches(submitted, reference);
       feedback = correct
           ? null
-          : 'Offline check needs an equivalent match (ignoring whitespace and '
-              'comments). Attach Gemini to accept any working code.';
+          : strings.offlineCheck;
     }
     if (!mounted) return;
     setState(() => _grading = false);
@@ -716,7 +718,7 @@ class _PracticeSessionScreenState
       padding: const EdgeInsets.all(16),
       children: [
         _codeTaskHeader(
-            'Fill in the blanks', 'Tap each blank and type the missing token.'),
+            context.s.fillBlanksTitle, context.s.fillBlanksSubtitle),
         const SizedBox(height: 12),
         Container(
           width: double.infinity,
@@ -729,7 +731,7 @@ class _PracticeSessionScreenState
         ),
         const SizedBox(height: 16),
         if (!answered)
-          FilledButton(onPressed: _checkBlanks, child: const Text('Check'))
+          FilledButton(onPressed: _checkBlanks, child: Text(context.s.check))
         else ...[
           _resultBanner(),
           const SizedBox(height: 12),
@@ -760,7 +762,7 @@ class _PracticeSessionScreenState
         Padding(
           padding: const EdgeInsets.all(16),
           child: _codeTaskHeader(
-              'Reorder the code', 'Drag the lines into the correct order.'),
+              context.s.reorderTitle, context.s.reorderSubtitle),
         ),
         Expanded(
           child: ReorderableListView.builder(
@@ -821,7 +823,7 @@ class _PracticeSessionScreenState
               : SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                      onPressed: _checkReorder, child: const Text('Check')),
+                      onPressed: _checkReorder, child: Text(context.s.check)),
                 ),
         ),
       ],
@@ -877,7 +879,7 @@ class _PracticeSessionScreenState
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Reference', style: Theme.of(context).textTheme.labelSmall),
+        Text(context.s.reference, style: Theme.of(context).textTheme.labelSmall),
         const SizedBox(height: 4),
         _codeBlock(_item.back ?? ''),
       ],
@@ -892,12 +894,12 @@ class _PracticeSessionScreenState
           Icon(Icons.emoji_events_outlined,
               size: 72, color: Theme.of(context).colorScheme.primary),
           const SizedBox(height: 16),
-          Text('Scored $_correctCount / ${widget.queue.length}',
+          Text(context.s.scored(_correctCount, widget.queue.length),
               style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 24),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Back'),
+            child: Text(context.s.back),
           ),
         ],
       ),

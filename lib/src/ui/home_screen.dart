@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/app_strings.dart';
 import '../providers/knowledge_providers.dart';
 import 'capture_screen.dart';
 import 'review_screen.dart';
@@ -28,11 +29,11 @@ class HomeScreen extends ConsumerWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openCapture(context),
         icon: const Icon(Icons.add),
-        label: const Text('Capture'),
+        label: Text(context.s.capture),
       ),
       body: itemsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Something went wrong:\n$e')),
+        error: (e, _) => Center(child: Text(context.s.somethingWentWrong(e))),
         data: (items) {
           if (items.isEmpty) {
             return const _EmptyState();
@@ -94,14 +95,14 @@ class _ReviewBanner extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              '$count ${count == 1 ? 'item' : 'items'} ready to challenge you',
+              context.s.readyToChallenge(count),
               style: TextStyle(
                 color: scheme.onPrimaryContainer,
                 fontWeight: FontWeight.w600,
               ),
             ),
           ),
-          FilledButton(onPressed: onStart, child: const Text('Review')),
+          FilledButton(onPressed: onStart, child: Text(context.s.review)),
         ],
       ),
     );
@@ -122,14 +123,13 @@ class _EmptyState extends StatelessWidget {
             const AppLogo(size: 96),
             const SizedBox(height: 16),
             Text(
-              'Your notes will hit back.',
+              context.s.emptyTitle,
               style: Theme.of(context).textTheme.titleLarge,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Capture a fact, a concept, a command, or a question. '
-              'The app will quiz you on it later so you never forget.',
+            Text(
+              context.s.emptyBody,
               textAlign: TextAlign.center,
             ),
           ],

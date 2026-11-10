@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../l10n/app_strings.dart';
 
 /// Whether the platform has a camera worth offering (mobile only).
 bool get _isMobile =>
@@ -23,12 +24,12 @@ Future<Uint8List?> pickImageBytes(BuildContext context) async {
           children: [
             ListTile(
               leading: const Icon(Icons.photo_camera),
-              title: const Text('Camera'),
+              title: Text(context.s.camera),
               onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
             ),
             ListTile(
               leading: const Icon(Icons.photo_library),
-              title: const Text('Gallery'),
+              title: Text(context.s.gallery),
               onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
             ),
           ],

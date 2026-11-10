@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../models/knowledge_item.dart';
 import '../../providers/knowledge_providers.dart';
 
@@ -20,7 +21,7 @@ class ItemTile extends ConsumerWidget {
         onTap: onTap,
         title: Text(item.front, maxLines: 2, overflow: TextOverflow.ellipsis),
         subtitle: Text(
-          item.hasAnswer ? item.back! : 'No answer yet',
+          item.hasAnswer ? item.back! : context.s.noAnswerYet,
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
           style: item.hasAnswer
@@ -30,7 +31,7 @@ class ItemTile extends ConsumerWidget {
         leading: TypeChip(type: item.type),
         trailing: IconButton(
           icon: const Icon(Icons.delete_outline),
-          tooltip: 'Delete',
+          tooltip: context.s.delete,
           onPressed: () =>
               ref.read(knowledgeListProvider.notifier).delete(item.id),
         ),

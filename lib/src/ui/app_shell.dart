@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/app_strings.dart';
 import '../providers/knowledge_providers.dart';
 import '../sync/sync_providers.dart';
 import 'home_screen.dart';
@@ -53,26 +54,26 @@ class _AppShellState extends ConsumerState<AppShell> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
-        destinations: const [
+        destinations: [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home),
-            label: 'Home',
+            label: context.s.navHome,
           ),
           NavigationDestination(
             icon: Icon(Icons.park_outlined),
             selectedIcon: Icon(Icons.park),
-            label: 'Notes',
+            label: context.s.navNotes,
           ),
           NavigationDestination(
             icon: Icon(Icons.fitness_center_outlined),
             selectedIcon: Icon(Icons.fitness_center),
-            label: 'Practice',
+            label: context.s.navPractice,
           ),
           NavigationDestination(
             icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings),
-            label: 'Settings',
+            label: context.s.navSettings,
           ),
         ],
       ),

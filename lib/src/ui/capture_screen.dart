@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/app_strings.dart';
 import '../llm/llm_providers.dart';
 import '../models/knowledge_item.dart';
 import '../providers/knowledge_providers.dart';
@@ -38,6 +39,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
   }
 
   Future<void> _expandWithAi() async {
+    final strings = context.s;
     final llm = ref.read(llmProvider);
     if (llm == null) return;
     final front = _frontController.text.trim();
@@ -69,13 +71,14 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
         // Non-fatal: the quiz will be generated lazily during practice.
       }
     } catch (e) {
-      _showError('Could not generate: $e');
+      _showError(strings.couldNotGenerate(e));
     } finally {
       if (mounted) setState(() => _aiBusy = false);
     }
   }
 
   Future<void> _suggestCategory() async {
+    final strings = context.s;
     final llm = ref.read(llmProvider);
     if (llm == null) return;
     final front = _frontController.text.trim();
@@ -88,7 +91,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
       );
       if (mounted) _categoryController.text = cat;
     } catch (e) {
-      _showError('Could not suggest: $e');
+      _showError(strings.couldNotSuggest(e));
     } finally {
       if (mounted) setState(() => _aiBusy = false);
     }
@@ -125,13 +128,13 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
   Widget build(BuildContext context) {
     final aiAttached = ref.watch(llmProvider) != null;
     return Scaffold(
-      appBar: AppBar(title: const Text('Capture knowledge')),
+      appBar: AppBar(title: Text(context.s.captureTitle)),
       body: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text('What kind of thing is this?',
+            Text(context.s.whatKind,
                 style: Theme.of(context).textTheme.labelLarge),
             const SizedBox(height: 8),
             Wrap(
@@ -139,7 +142,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
               children: [
                 for (final type in KnowledgeType.values)
                   ChoiceChip(
-                    label: Text(type.label),
+                    label: Text(context.s.noteType(type)),
                     selected: _type == type,
                     onSelected: (_) => setState(() => _type = type),
                   ),
@@ -152,14 +155,14 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
               minLines: 1,
               maxLines: 4,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                labelText: 'Prompt',
+              decoration: InputDecoration(
+                labelText: context.s.prompt,
                 hintText:
-                    'A question, a concept name, a command — what to recall',
+                    context.s.promptHint,
                 border: OutlineInputBorder(),
               ),
               validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Add something to recall' : null,
+                  (v == null || v.trim().isEmpty) ? context.s.promptRequired : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -167,9 +170,9 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
               minLines: 2,
               maxLines: 8,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                labelText: 'Answer / details (optional)',
-                hintText: 'Leave blank if you only jotted a fragment',
+              decoration: InputDecoration(
+                labelText: context.s.answerOptional,
+                hintText: context.s.answerHint,
                 border: OutlineInputBorder(),
               ),
             ),
@@ -185,7 +188,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.auto_awesome, size: 18),
-                  label: const Text('Generate answer'),
+                  label: Text(context.s.generateAnswer),
                 ),
               ),
             ],
@@ -195,8 +198,8 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                 Expanded(
                   child: TextFormField(
                     controller: _categoryController,
-                    decoration: const InputDecoration(
-                      labelText: 'Category (optional)',
+                    decoration: InputDecoration(
+                      labelText: context.s.categoryOptional,
                       hintText: 'e.g. Math, ML, Linux, Cybersec',
                       border: OutlineInputBorder(),
                     ),
@@ -204,7 +207,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                 ),
                 if (aiAttached)
                   IconButton(
-                    tooltip: 'Suggest category',
+                    tooltip: context.s.suggestCategory,
                     onPressed: _aiBusy ? null : _suggestCategory,
                     icon: const Icon(Icons.auto_awesome),
                   ),
@@ -235,7 +238,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
             OutlinedButton.icon(
               onPressed: _pickImage,
               icon: const Icon(Icons.image_outlined),
-              label: Text(_imageBytes == null ? 'Add image' : 'Replace image'),
+              label: Text(_imageBytes == null ? context.s.addImage : context.s.replaceImage),
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
@@ -247,7 +250,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.check),
-              label: const Text('Save'),
+              label: Text(context.s.save),
             ),
           ],
         ),

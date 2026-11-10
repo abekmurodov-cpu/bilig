@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/settings_repository.dart';
+import '../l10n/app_strings.dart';
 import '../providers/settings_providers.dart';
 import 'notification_service.dart';
 
@@ -36,8 +37,17 @@ class ReminderNotifier extends Notifier<ReminderSettings> {
   SettingsRepository get _s => ref.read(settingsRepositoryProvider);
   NotificationService get _service => ref.read(notificationServiceProvider);
 
+  /// Reminder text in the current interface language.
+  String get _body => AppStrings(ref.read(languageProvider)).reminderBody;
+
   @override
   ReminderSettings build() {
+    // Reschedule so the notification text follows a language change.
+    ref.listen(languageProvider, (_, _) {
+      if (state.enabled) {
+        _service.scheduleDailyReminder(state.hour, state.minute, body: _body);
+      }
+    });
     return ReminderSettings(
       enabled: _s.getString(SettingsRepository.kReminderEnabled) == 'true',
       hour: _s.getInt(SettingsRepository.kReminderHour) ?? 9,
@@ -49,7 +59,8 @@ class ReminderNotifier extends Notifier<ReminderSettings> {
     if (enabled) {
       final granted = await _service.requestPermission();
       if (!granted) return;
-      await _service.scheduleDailyReminder(state.hour, state.minute);
+      await _service.scheduleDailyReminder(state.hour, state.minute,
+          body: _body);
     } else {
       await _service.cancelDailyReminder();
     }
@@ -63,7 +74,7 @@ class ReminderNotifier extends Notifier<ReminderSettings> {
     await _s.setInt(SettingsRepository.kReminderMinute, minute);
     state = state.copyWith(hour: hour, minute: minute);
     if (state.enabled) {
-      await _service.scheduleDailyReminder(hour, minute);
+      await _service.scheduleDailyReminder(hour, minute, body: _body);
     }
   }
 }

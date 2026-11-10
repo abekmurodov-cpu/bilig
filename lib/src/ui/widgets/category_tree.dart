@@ -2,7 +2,9 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../models/knowledge_item.dart';
+import '../../providers/knowledge_providers.dart';
 import 'tree_model.dart';
 
 /// Whether a note's leaf is "autumn" (needs training): never reviewed, last
@@ -16,6 +18,10 @@ Color leafColor(KnowledgeItem item, {DateTime? now}) =>
 
 const Color summerLeafColor = Color(0xFF3E9B3A);
 const Color autumnLeafColor = Color(0xFFE8A317);
+
+/// The synthetic ungrouped bucket is shown in the interface language.
+String _displayName(BuildContext context, String category) =>
+    category == kUngroupedCategory ? context.s.ungrouped : category;
 
 /// Notes in leaf order: oldest first, so existing leaves keep their spot as new
 /// notes sprout.
@@ -74,14 +80,14 @@ class CategoryTree extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(
                   child: Text(
-                    category,
+                    _displayName(context, category),
                     style: theme.textTheme.titleMedium,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
                 Text('${notes.length}', style: theme.textTheme.labelMedium),
                 IconButton(
-                  tooltip: 'Zoom',
+                  tooltip: context.s.zoom,
                   icon: const Icon(Icons.zoom_out_map, size: 20),
                   onPressed: () => _openViewer(context, ordered, model),
                 ),
@@ -198,7 +204,7 @@ class _TreeViewerScreenState extends State<TreeViewerScreen> {
     final model = widget.model;
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.category),
+        title: Text(_displayName(context, widget.category)),
         actions: [
           Center(
             child: Padding(
@@ -245,19 +251,19 @@ class _TreeViewerScreenState extends State<TreeViewerScreen> {
                   children: [
                     _ZoomButton(
                       icon: Icons.add,
-                      tooltip: 'Zoom in',
+                      tooltip: context.s.zoomIn,
                       onPressed: () => _zoom(1.4),
                     ),
                     const SizedBox(height: 8),
                     _ZoomButton(
                       icon: Icons.remove,
-                      tooltip: 'Zoom out',
+                      tooltip: context.s.zoomOut,
                       onPressed: () => _zoom(1 / 1.4),
                     ),
                     const SizedBox(height: 8),
                     _ZoomButton(
                       icon: Icons.fit_screen,
-                      tooltip: 'Fit',
+                      tooltip: context.s.fit,
                       onPressed: () => setState(_fit),
                     ),
                   ],
@@ -362,6 +368,18 @@ class _TreePainter extends CustomPainter {
     final fill = Paint()..color = bark;
     final shade = Paint()..color = barkShade.withValues(alpha: 0.3);
 
+    // Root flare first, so the trunk's shading runs over it.
+    final trunk = model.branches.first;
+    final w = trunk.startWidth;
+    final root = Path()
+      ..moveTo(trunk.start.dx - w * 1.1, trunk.start.dy)
+      ..quadraticBezierTo(trunk.start.dx - w * 0.45, trunk.start.dy - w * 0.25,
+          trunk.start.dx - w * 0.3, trunk.start.dy - w * 0.9)
+      ..lineTo(trunk.start.dx + w * 0.3, trunk.start.dy - w * 0.9)
+      ..quadraticBezierTo(trunk.start.dx + w * 0.45, trunk.start.dy - w * 0.25,
+          trunk.start.dx + w * 1.1, trunk.start.dy)
+      ..close();
+    canvas.drawPath(root, fill);
     for (final b in model.branches) {
       final path = _taperedPath(b);
       canvas.drawPath(path, fill);
@@ -382,18 +400,6 @@ class _TreePainter extends CustomPainter {
       );
       canvas.drawPath(_taperedPath(shifted), shade);
     }
-    // Root flare.
-    final trunk = model.branches.first;
-    final w = trunk.startWidth;
-    final root = Path()
-      ..moveTo(trunk.start.dx - w * 1.1, trunk.start.dy)
-      ..quadraticBezierTo(trunk.start.dx - w * 0.45, trunk.start.dy - w * 0.25,
-          trunk.start.dx - w * 0.4, trunk.start.dy - w * 1.2)
-      ..lineTo(trunk.start.dx + w * 0.4, trunk.start.dy - w * 1.2)
-      ..quadraticBezierTo(trunk.start.dx + w * 0.45, trunk.start.dy - w * 0.25,
-          trunk.start.dx + w * 1.1, trunk.start.dy)
-      ..close();
-    canvas.drawPath(root, fill);
   }
 
   /// Outline of a quadratic bezier limb whose width tapers start → end.

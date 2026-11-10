@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/app_strings.dart';
 import '../models/knowledge_item.dart';
 import '../providers/knowledge_providers.dart';
 import '../scheduler/spaced_repetition.dart';
@@ -44,7 +45,7 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(done ? 'Done' : 'Review  ${_index + 1}/${_queue.length}'),
+        title: Text(done ? context.s.done : 'Review  ${_index + 1}/${_queue.length}'),
       ),
       body: done ? _DoneView(count: _queue.length) : _buildCard(context),
     );
@@ -75,23 +76,23 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
                       },
                       front: _face(
                         context,
-                        item.type.label.toUpperCase(),
+                        context.s.noteType(item.type).toUpperCase(),
                         item.front,
                         image: item.hasImage ? item.id : null,
                       ),
                       back: _face(
                         context,
-                        'ANSWER',
+                        context.s.answerLabel,
                         item.hasAnswer
                             ? item.back!
-                            : '(no answer recorded yet)',
+                            : context.s.noAnswerRecorded,
                       ),
                     ),
                     const SizedBox(height: 14),
                     Text(
                       showGrades
-                          ? 'How well did you recall it?'
-                          : 'Tap the card to flip',
+                          ? context.s.howWell
+                          : context.s.tapToFlip,
                       style: theme.textTheme.bodySmall,
                     ),
                   ],
@@ -144,7 +145,7 @@ class _GradeButtons extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: OutlinedButton(
                 onPressed: () => onGrade(grade),
-                child: Text(grade.label),
+                child: Text(context.s.grade(grade)),
               ),
             ),
           ),
@@ -168,13 +169,13 @@ class _DoneView extends StatelessWidget {
               size: 72, color: Theme.of(context).colorScheme.primary),
           const SizedBox(height: 16),
           Text(
-            count == 0 ? 'Nothing due right now.' : 'Reviewed $count. Nice work.',
+            count == 0 ? context.s.nothingDue : context.s.reviewed(count),
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 24),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Back'),
+            child: Text(context.s.back),
           ),
         ],
       ),

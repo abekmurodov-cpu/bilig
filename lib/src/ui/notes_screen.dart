@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/app_strings.dart';
 import '../providers/knowledge_providers.dart';
 import 'widgets/category_tree.dart';
 import 'widgets/item_tile.dart';
@@ -48,21 +49,21 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Notes'),
+        title: Text(context.s.navNotes),
         bottom: PreferredSize(
           preferredSize: const Size.fromHeight(56),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
             child: SegmentedButton<_NotesView>(
-              segments: const [
+              segments: [
                 ButtonSegment(
                   value: _NotesView.list,
-                  label: Text('List'),
+                  label: Text(context.s.viewList),
                   icon: Icon(Icons.view_list),
                 ),
                 ButtonSegment(
                   value: _NotesView.tree,
-                  label: Text('Tree'),
+                  label: Text(context.s.viewTree),
                   icon: Icon(Icons.park),
                 ),
               ],
@@ -147,8 +148,8 @@ class _TreeLegend extends StatelessWidget {
         spacing: 16,
         runSpacing: 8,
         children: [
-          dot(summerLeafColor, 'Learned'),
-          dot(autumnLeafColor, 'Needs training'),
+          dot(summerLeafColor, context.s.legendLearned),
+          dot(autumnLeafColor, context.s.legendNeedsTraining),
         ],
       ),
     );
@@ -169,7 +170,7 @@ class _EmptyNotes extends StatelessWidget {
             Icon(Icons.eco_outlined,
                 size: 64, color: Theme.of(context).colorScheme.primary),
             const SizedBox(height: 12),
-            const Text('No notes yet. Capture some and watch them grow.'),
+            Text(context.s.noNotes),
           ],
         ),
       ),

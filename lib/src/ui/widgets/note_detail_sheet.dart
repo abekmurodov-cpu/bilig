@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../models/knowledge_item.dart';
 import '../../providers/knowledge_providers.dart';
 import 'image_picking.dart';
@@ -89,18 +90,18 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
             TypeChip(type: item.type),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(item.type.label.toUpperCase(),
+              child: Text(context.s.noteType(item.type).toUpperCase(),
                   style: theme.textTheme.labelSmall
                       ?.copyWith(letterSpacing: 1.2)),
             ),
             IconButton(
               icon: const Icon(Icons.edit_outlined),
-              tooltip: 'Edit',
+              tooltip: context.s.edit,
               onPressed: () => setState(() => _editing = true),
             ),
             IconButton(
               icon: const Icon(Icons.delete_outline),
-              tooltip: 'Delete',
+              tooltip: context.s.delete,
               onPressed: _delete,
             ),
           ],
@@ -111,7 +112,7 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
         NoteImage(noteId: item.id),
         const Divider(height: 28),
         Text(
-          item.hasAnswer ? item.back! : 'No answer yet',
+          item.hasAnswer ? item.back! : context.s.noAnswerYet,
           style: item.hasAnswer
               ? theme.textTheme.bodyLarge
               : theme.textTheme.bodyLarge
@@ -137,7 +138,7 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
           children: [
             for (final type in KnowledgeType.values)
               ChoiceChip(
-                label: Text(type.label),
+                label: Text(context.s.noteType(type)),
                 selected: _type == type,
                 onSelected: (_) => setState(() => _type = type),
               ),
@@ -148,22 +149,22 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
           controller: _front,
           minLines: 1,
           maxLines: 4,
-          decoration: const InputDecoration(
-              labelText: 'Prompt', border: OutlineInputBorder()),
+          decoration: InputDecoration(
+              labelText: context.s.prompt, border: OutlineInputBorder()),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: _back,
           minLines: 2,
           maxLines: 6,
-          decoration: const InputDecoration(
-              labelText: 'Answer / details', border: OutlineInputBorder()),
+          decoration: InputDecoration(
+              labelText: context.s.answerDetails, border: OutlineInputBorder()),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: _category,
-          decoration: const InputDecoration(
-              labelText: 'Category', border: OutlineInputBorder()),
+          decoration: InputDecoration(
+              labelText: context.s.category, border: OutlineInputBorder()),
         ),
         const SizedBox(height: 12),
         Row(
@@ -171,7 +172,7 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
             OutlinedButton.icon(
               onPressed: _pickImage,
               icon: const Icon(Icons.image_outlined),
-              label: Text(widget.item.hasImage ? 'Replace image' : 'Add image'),
+              label: Text(widget.item.hasImage ? context.s.replaceImage : context.s.addImage),
             ),
             if (widget.item.hasImage) ...[
               const SizedBox(width: 8),
@@ -180,7 +181,7 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
                     .read(knowledgeListProvider.notifier)
                     .removeImage(widget.item),
                 icon: const Icon(Icons.delete_outline),
-                label: const Text('Remove'),
+                label: Text(context.s.remove),
               ),
             ],
           ],
@@ -191,10 +192,10 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
           children: [
             TextButton(
               onPressed: () => setState(() => _editing = false),
-              child: const Text('Cancel'),
+              child: Text(context.s.cancel),
             ),
             const SizedBox(width: 8),
-            FilledButton(onPressed: _save, child: const Text('Save')),
+            FilledButton(onPressed: _save, child: Text(context.s.save)),
           ],
         ),
       ],

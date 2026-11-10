@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_strings.dart';
 import '../../llm/llm_providers.dart';
 import '../../practice/practice_models.dart';
 import '../../providers/knowledge_providers.dart';
@@ -32,7 +33,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
 
     if (queue.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No notes match this selection.')),
+        SnackBar(content: Text(context.s.noMatch)),
       );
       return;
     }
@@ -49,11 +50,11 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Practice')),
+      appBar: AppBar(title: Text(context.s.navPractice)),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text('Method', style: theme.textTheme.titleMedium),
+          Text(context.s.method, style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           RadioGroup<PracticeMethod>(
             groupValue: _method,
@@ -63,8 +64,8 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
                 for (final m in PracticeMethod.values.where((m) => !m.isCoding))
                   RadioListTile<PracticeMethod>(
                     value: m,
-                    title: Text(m.label),
-                    subtitle: Text(m.blurb),
+                    title: Text(context.s.methodLabel(m)),
+                    subtitle: Text(context.s.methodBlurb(m)),
                     contentPadding: EdgeInsets.zero,
                   ),
                 Padding(
@@ -73,11 +74,11 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
                     children: [
                       Icon(Icons.code, size: 16, color: theme.colorScheme.primary),
                       const SizedBox(width: 6),
-                      Text('Coding drills',
+                      Text(context.s.codingDrills,
                           style: theme.textTheme.labelLarge
                               ?.copyWith(color: theme.colorScheme.primary)),
                       const SizedBox(width: 6),
-                      Text('(code notes only)',
+                      Text(context.s.codeNotesOnly,
                           style: theme.textTheme.labelSmall),
                     ],
                   ),
@@ -85,15 +86,15 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
                 for (final m in PracticeMethod.values.where((m) => m.isCoding))
                   RadioListTile<PracticeMethod>(
                     value: m,
-                    title: Text(m.label),
-                    subtitle: Text(m.blurb),
+                    title: Text(context.s.methodLabel(m)),
+                    subtitle: Text(context.s.methodBlurb(m)),
                     contentPadding: EdgeInsets.zero,
                   ),
               ],
             ),
           ),
           const Divider(height: 32),
-          Text('Scope', style: theme.textTheme.titleMedium),
+          Text(context.s.scope, style: theme.textTheme.titleMedium),
           const SizedBox(height: 8),
           RadioGroup<PracticeScope>(
             groupValue: _scope,
@@ -103,8 +104,8 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
                 for (final s in PracticeScope.values)
                   RadioListTile<PracticeScope>(
                     value: s,
-                    title: Text(s.label),
-                    subtitle: Text(s.blurb),
+                    title: Text(context.s.scopeLabel(s)),
+                    subtitle: Text(context.s.scopeBlurb(s)),
                     contentPadding: EdgeInsets.zero,
                   ),
               ],
@@ -113,12 +114,12 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
           if (_scope == PracticeScope.category) ...[
             const SizedBox(height: 8),
             if (categories.isEmpty)
-              const Text('No categories yet — add categories to your notes.')
+              Text(context.s.noCategories)
             else
               DropdownButtonFormField<String>(
                 initialValue: _category,
-                decoration: const InputDecoration(
-                  labelText: 'Category',
+                decoration: InputDecoration(
+                  labelText: context.s.category,
                   border: OutlineInputBorder(),
                 ),
                 items: [
@@ -134,7 +135,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
                 ? null
                 : _start,
             icon: const Icon(Icons.play_arrow),
-            label: const Text('Start practice'),
+            label: Text(context.s.startPractice),
           ),
         ],
       ),

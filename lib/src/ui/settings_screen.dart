@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/app_strings.dart';
 import '../llm/llm_providers.dart';
 import '../notifications/notification_providers.dart';
 import '../providers/knowledge_providers.dart';
@@ -15,11 +16,12 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(title: Text(context.s.navSettings)),
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 8),
         children: const [
           _ThemeSection(),
+          _LanguageSection(),
           if (!kIsWeb) _RemindersSection(),
           _LlmSection(),
           _TelegramSection(),
@@ -66,30 +68,58 @@ class _ThemeSection extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final mode = ref.watch(themeModeProvider);
     return SettingsSection(
-      title: 'Appearance',
+      title: context.s.appearance,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: SegmentedButton<ThemeMode>(
-          segments: const [
+          segments: [
             ButtonSegment(
               value: ThemeMode.system,
-              label: Text('System'),
+              label: Text(context.s.themeSystem),
               icon: Icon(Icons.brightness_auto),
             ),
             ButtonSegment(
               value: ThemeMode.light,
-              label: Text('Light'),
+              label: Text(context.s.themeLight),
               icon: Icon(Icons.light_mode),
             ),
             ButtonSegment(
               value: ThemeMode.dark,
-              label: Text('Dark'),
+              label: Text(context.s.themeDark),
               icon: Icon(Icons.dark_mode),
             ),
           ],
           selected: {mode},
           onSelectionChanged: (s) =>
               ref.read(themeModeProvider.notifier).set(s.first),
+        ),
+      ),
+    );
+  }
+}
+
+class _LanguageSection extends ConsumerWidget {
+  const _LanguageSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(languageProvider);
+    return SettingsSection(
+      title: context.s.languageTitle,
+      child: RadioGroup<AppLanguage>(
+        groupValue: current,
+        onChanged: (l) {
+          if (l != null) ref.read(languageProvider.notifier).set(l);
+        },
+        child: Column(
+          children: [
+            for (final l in AppLanguage.values)
+              RadioListTile<AppLanguage>(
+                value: l,
+                secondary: Text(l.flag, style: const TextStyle(fontSize: 26)),
+                title: Text(l.nativeName),
+              ),
+          ],
         ),
       ),
     );
@@ -104,19 +134,19 @@ class _RemindersSection extends ConsumerWidget {
     final reminder = ref.watch(reminderProvider);
     final notifier = ref.read(reminderProvider.notifier);
     return SettingsSection(
-      title: 'Reminders',
+      title: context.s.reminders,
       child: Column(
         children: [
           SwitchListTile(
-            title: const Text('Daily review reminder'),
-            subtitle: const Text('A nudge to review your notes'),
+            title: Text(context.s.dailyReminder),
+            subtitle: Text(context.s.dailyReminderSubtitle),
             value: reminder.enabled,
             onChanged: notifier.setEnabled,
           ),
           ListTile(
             enabled: reminder.enabled,
             leading: const Icon(Icons.schedule),
-            title: const Text('Reminder time'),
+            title: Text(context.s.reminderTime),
             trailing: Text(reminder.time.format(context)),
             onTap: reminder.enabled
                 ? () async {
@@ -167,7 +197,7 @@ class _LlmSectionState extends ConsumerState<_LlmSection> {
     final attached = key != null && key.isNotEmpty;
 
     return SettingsSection(
-      title: 'AI provider',
+      title: context.s.aiProvider,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: attached
@@ -178,19 +208,19 @@ class _LlmSectionState extends ConsumerState<_LlmSection> {
                     children: [
                       const Icon(Icons.check_circle, color: Color(0xFF2E9E4F)),
                       const SizedBox(width: 12),
-                      const Expanded(child: Text('Gemini attached')),
+                      Expanded(child: Text(context.s.geminiAttached)),
                       TextButton.icon(
                         onPressed: () =>
                             ref.read(geminiKeyProvider.notifier).detach(),
                         icon: const Icon(Icons.link_off),
-                        label: const Text('Detach'),
+                        label: Text(context.s.detach),
                       ),
                     ],
                   ),
                   const SizedBox(height: 8),
                   InputDecorator(
-                    decoration: const InputDecoration(
-                      labelText: 'Model',
+                    decoration: InputDecoration(
+                      labelText: context.s.model,
                       border: OutlineInputBorder(),
                       isDense: true,
                     ),
@@ -215,16 +245,13 @@ class _LlmSectionState extends ConsumerState<_LlmSection> {
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Attach Gemini to auto-expand notes, generate quizzes, '
-                    'grade typed answers, and suggest categories.',
-                  ),
+                  Text(context.s.geminiBlurb),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _keyController,
                     obscureText: _obscure,
                     decoration: InputDecoration(
-                      labelText: 'Gemini API key',
+                      labelText: context.s.geminiKey,
                       border: const OutlineInputBorder(),
                       suffixIcon: IconButton(
                         icon: Icon(_obscure
@@ -240,7 +267,7 @@ class _LlmSectionState extends ConsumerState<_LlmSection> {
                     child: FilledButton.icon(
                       onPressed: _attach,
                       icon: const Icon(Icons.link),
-                      label: const Text('Attach'),
+                      label: Text(context.s.attach),
                     ),
                   ),
                 ],
@@ -285,6 +312,7 @@ class _TelegramSectionState extends ConsumerState<_TelegramSection> {
   }
 
   Future<void> _attach() async {
+    final strings = context.s;
     if (_tokenController.text.trim().isEmpty ||
         _chatController.text.trim().isEmpty) {
       return;
@@ -293,7 +321,7 @@ class _TelegramSectionState extends ConsumerState<_TelegramSection> {
     final chatId = TelegramSyncService.normalizeChatId(_chatController.text);
     setState(() {
       _busy = true;
-      _status = 'Validating bot…';
+      _status = strings.validatingBot;
     });
     try {
       // Validate the token and chat before persisting.
@@ -305,28 +333,30 @@ class _TelegramSectionState extends ConsumerState<_TelegramSection> {
           );
       _tokenController.clear();
       _chatController.clear();
-      _report('Attached @$username');
+      _report(strings.attachedBot(username));
     } catch (e) {
-      _report('Could not attach: ${e.toString().replaceFirst('Exception: ', '')}');
+      _report(strings.couldNotAttach(
+          e.toString().replaceFirst('Exception: ', '')));
     } finally {
       _clearBusy();
     }
   }
 
   Future<void> _syncNow() async {
+    final strings = context.s;
     final controller = ref.read(syncControllerProvider);
     if (controller == null) return;
     setState(() {
       _busy = true;
-      _status = 'Syncing…';
+      _status = strings.syncing;
     });
     try {
       final summary = await controller.syncNow();
       // Reload the list so merged remote notes appear immediately.
       ref.invalidate(knowledgeListProvider);
-      _report('Synced ${summary.noteCount} notes');
+      _report(strings.synced(summary.noteCount));
     } catch (e) {
-      _report('Sync failed: $e');
+      _report(strings.syncFailed(e));
     } finally {
       _clearBusy();
     }
@@ -338,7 +368,7 @@ class _TelegramSectionState extends ConsumerState<_TelegramSection> {
     final attached = config != null;
 
     return SettingsSection(
-      title: 'Sync (Telegram)',
+      title: context.s.syncTelegram,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: attached
@@ -351,7 +381,7 @@ class _TelegramSectionState extends ConsumerState<_TelegramSection> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Connected${config.user == null ? '' : ' · @${config.user}'}\nChat ${config.chatId}',
+                          context.s.connected(config.user, config.chatId),
                         ),
                       ),
                     ],
@@ -368,7 +398,7 @@ class _TelegramSectionState extends ConsumerState<_TelegramSection> {
                                 child:
                                     CircularProgressIndicator(strokeWidth: 2))
                             : const Icon(Icons.sync),
-                        label: Text(_status ?? 'Sync now'),
+                        label: Text(_status ?? context.s.syncNow),
                       ),
                       const Spacer(),
                       TextButton.icon(
@@ -378,7 +408,7 @@ class _TelegramSectionState extends ConsumerState<_TelegramSection> {
                                 .read(telegramConfigProvider.notifier)
                                 .detach(),
                         icon: const Icon(Icons.link_off),
-                        label: const Text('Detach'),
+                        label: Text(context.s.detach),
                       ),
                     ],
                   ),
@@ -387,26 +417,21 @@ class _TelegramSectionState extends ConsumerState<_TelegramSection> {
             : Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Sync across devices via a Telegram bot. Create a bot with '
-                    '@BotFather, make a private channel, add the bot as an admin, '
-                    'and paste the token + chat id below. Note: the bot token is '
-                    'stored on-device.',
-                  ),
+                  Text(context.s.telegramBlurb),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _tokenController,
-                    decoration: const InputDecoration(
-                      labelText: 'Bot token',
+                    decoration: InputDecoration(
+                      labelText: context.s.botToken,
                       border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 12),
                   TextField(
                     controller: _chatController,
-                    decoration: const InputDecoration(
-                      labelText: 'Chat / channel id',
-                      hintText: 'e.g. @my_channel or -1001234567890',
+                    decoration: InputDecoration(
+                      labelText: context.s.chatId,
+                      hintText: context.s.chatIdHint,
                       border: OutlineInputBorder(),
                     ),
                   ),
@@ -421,7 +446,7 @@ class _TelegramSectionState extends ConsumerState<_TelegramSection> {
                               height: 16,
                               child: CircularProgressIndicator(strokeWidth: 2))
                           : const Icon(Icons.link),
-                      label: Text(_status ?? 'Attach'),
+                      label: Text(_status ?? context.s.attach),
                     ),
                   ),
                 ],

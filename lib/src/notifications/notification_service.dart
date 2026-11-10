@@ -66,13 +66,14 @@ class NotificationService {
   /// (Re)schedules a daily reminder at [hour]:[minute]. Prefers exact alarms so
   /// it fires on time; if the OS denies exact-alarm permission it falls back to
   /// inexact scheduling (which Android may delay to save battery).
-  Future<void> scheduleDailyReminder(int hour, int minute) async {
+  Future<void> scheduleDailyReminder(int hour, int minute,
+      {required String body}) async {
     if (kIsWeb || !_ready) return;
     await cancelDailyReminder();
     Future<void> schedule(AndroidScheduleMode mode) => _plugin.zonedSchedule(
           _dailyReminderId,
           'Bilig',
-          'Time to review — your notes are waiting to challenge you.',
+          body,
           _nextInstanceOf(hour, minute),
           _details,
           androidScheduleMode: mode,
