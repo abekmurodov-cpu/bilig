@@ -285,17 +285,21 @@ class _TelegramSectionState extends ConsumerState<_TelegramSection> {
   }
 
   Future<void> _attach() async {
-    final token = _tokenController.text.trim();
-    final chatId = _chatController.text.trim();
-    if (token.isEmpty || chatId.isEmpty) return;
+    if (_tokenController.text.trim().isEmpty ||
+        _chatController.text.trim().isEmpty) {
+      return;
+    }
+    final token = TelegramSyncService.normalizeToken(_tokenController.text);
+    final chatId = TelegramSyncService.normalizeChatId(_chatController.text);
     setState(() {
       _busy = true;
       _status = 'Validating bot…';
     });
     try {
-      // Validate the token before persisting.
-      final username =
-          await TelegramSyncService(botToken: token, chatId: chatId).getMe();
+      // Validate the token and chat before persisting.
+      final service = TelegramSyncService(botToken: token, chatId: chatId);
+      final username = await service.getMe();
+      await service.checkChat();
       await ref.read(telegramConfigProvider.notifier).attach(
             TelegramConfig(botToken: token, chatId: chatId, user: username),
           );
@@ -303,7 +307,7 @@ class _TelegramSectionState extends ConsumerState<_TelegramSection> {
       _chatController.clear();
       _report('Attached @$username');
     } catch (e) {
-      _report('Could not attach: $e');
+      _report('Could not attach: ${e.toString().replaceFirst('Exception: ', '')}');
     } finally {
       _clearBusy();
     }

@@ -23,6 +23,25 @@ class TelegramSyncService {
 
   static const String _fileName = 'knowledge.json';
 
+  static final RegExp _tokenPattern = RegExp(r'\d+:[A-Za-z0-9_-]{30,}');
+
+  /// Extracts the bare `123456:ABC…` token from whatever the user pasted — a
+  /// `bot` prefix, an api.telegram.org URL, or BotFather's whole message.
+  static String normalizeToken(String input) {
+    final match = _tokenPattern.firstMatch(input);
+    return match?.group(0) ?? input.replaceAll(RegExp(r'\s'), '');
+  }
+
+  /// Accepts `-100…` ids, `@name`, bare `name`, or `t.me/name` links.
+  static String normalizeChatId(String input) {
+    var id = input.trim();
+    final link = RegExp(r'(?:https?://)?t(?:elegram)?\.me/([A-Za-z0-9_]+)')
+        .firstMatch(id);
+    if (link != null) id = link.group(1)!;
+    if (RegExp(r'^-?\d+$').hasMatch(id) || id.startsWith('@')) return id;
+    return '@$id';
+  }
+
   String get _apiBase => 'https://api.telegram.org/bot$botToken';
   String get _fileBase => 'https://api.telegram.org/file/bot$botToken';
 
@@ -33,11 +52,34 @@ class TelegramSyncService {
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode(params),
     );
-    final body = jsonDecode(resp.body) as Map<String, dynamic>;
+    final Map<String, dynamic> body;
+    try {
+      body = jsonDecode(resp.body) as Map<String, dynamic>;
+    } on FormatException {
+      throw Exception('Telegram $method failed: HTTP ${resp.statusCode}');
+    }
     if (body['ok'] != true) {
-      throw Exception('Telegram $method failed: ${body['description']}');
+      throw Exception(_explain(method, body['description'] as String?));
     }
     return body['result'];
+  }
+
+  /// Turns Telegram's terse error descriptions into actionable messages.
+  static String _explain(String method, String? description) {
+    final d = description ?? 'unknown error';
+    if (d == 'Unauthorized') {
+      return 'Telegram rejected the bot token. Copy it again from @BotFather '
+          '(or /revoke and use the new one).';
+    }
+    if (d == 'Not Found') {
+      return 'The bot token is malformed. It should look like '
+          '123456789:AAH… with no "bot" prefix or extra text.';
+    }
+    if (d.contains('chat not found')) {
+      return 'Chat not found. Add the bot to the channel as an admin, and use '
+          '@channelname (public) or the -100… id (private).';
+    }
+    return 'Telegram $method failed: $d';
   }
 
   /// Validates the token and returns the bot's username (for the settings UI).
@@ -45,6 +87,10 @@ class TelegramSyncService {
     final result = await _call('getMe', const {}) as Map<String, dynamic>;
     return result['username'] as String? ?? 'bot';
   }
+
+  /// Confirms the bot can see [chatId], so a bad id fails at attach time
+  /// instead of on the first sync.
+  Future<void> checkChat() => _call('getChat', {'chat_id': chatId});
 
   /// Downloads the pinned note database, or null if nothing is pinned yet.
   Future<String?> pull() async {
