@@ -147,9 +147,8 @@ class _TreeLegend extends StatelessWidget {
         spacing: 16,
         runSpacing: 8,
         children: [
-          dot(const Color(0xFF2E9E4F), 'Recalled'),
-          dot(const Color(0xFFD64545), 'Needs work'),
-          dot(const Color(0xFFE0A93B), 'New'),
+          dot(summerLeafColor, 'Learned'),
+          dot(autumnLeafColor, 'Needs training'),
         ],
       ),
     );
