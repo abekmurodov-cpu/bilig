@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/knowledge_providers.dart';
 import 'capture_screen.dart';
 import 'review_screen.dart';
+import 'widgets/app_logo.dart';
 import 'widgets/item_tile.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -16,7 +17,13 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Knowledge'),
+        title: const Row(
+          children: [
+            AppLogo(size: 34),
+            SizedBox(width: 10),
+            Text('Bilig'),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openCapture(context),
@@ -112,8 +119,7 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.psychology_outlined,
-                size: 72, color: Theme.of(context).colorScheme.primary),
+            const AppLogo(size: 96),
             const SizedBox(height: 16),
             Text(
               'Your notes will hit back.',

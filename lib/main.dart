@@ -28,19 +28,19 @@ Future<void> main() async {
         settingsRepositoryProvider.overrideWithValue(settings),
         notificationServiceProvider.overrideWithValue(notifications),
       ],
-      child: const KnowledgeApp(),
+      child: const BiligApp(),
     ),
   );
 }
 
-class KnowledgeApp extends ConsumerWidget {
-  const KnowledgeApp({super.key});
+class BiligApp extends ConsumerWidget {
+  const BiligApp({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final themeMode = ref.watch(themeModeProvider);
     return MaterialApp(
-      title: 'Knowledge',
+      title: 'Bilig',
       debugShowCheckedModeBanner: false,
       themeMode: themeMode,
       theme: ThemeData(

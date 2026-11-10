@@ -71,7 +71,7 @@ class NotificationService {
     await cancelDailyReminder();
     Future<void> schedule(AndroidScheduleMode mode) => _plugin.zonedSchedule(
           _dailyReminderId,
-          'Knowledge',
+          'Bilig',
           'Time to review — your notes are waiting to challenge you.',
           _nextInstanceOf(hour, minute),
           _details,
