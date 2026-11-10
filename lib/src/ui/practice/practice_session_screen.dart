@@ -46,6 +46,10 @@ class _PracticeSessionScreenState
   bool _preparing = false;
   // Flashcard state.
   bool _revealed = false;
+  // Furthest card reached. Cards before it were graded or skipped and are
+  // view-only when revisited with "Previous".
+  int _frontier = 0;
+  final Map<int, ReviewGrade> _flashGrades = {};
   // Multiple-choice state.
   List<String>? _options;
   String? _correctOption;
@@ -230,9 +234,21 @@ class _PracticeSessionScreenState
   }
 
   Future<void> _grade(ReviewGrade grade) async {
+    _flashGrades[_index] = grade;
     await ref.read(knowledgeListProvider.notifier).grade(_item, grade);
     if (grade.quality >= 3) _correctCount++;
     _advance();
+  }
+
+  /// Flashcard navigation. Moving past the frontier skips the card ungraded.
+  void _goToCard(int index) {
+    if (!mounted || index < 0) return;
+    setState(() {
+      _index = index;
+      if (index > _frontier) _frontier = index;
+      _revealed = false;
+    });
+    if (_index < _queue.length) _prepareItem();
   }
 
   Future<void> _submitObjective(bool correct, {String? feedback}) async {
@@ -253,6 +269,7 @@ class _PracticeSessionScreenState
     _disposeBlankControllers();
     setState(() {
       _index++;
+      if (_index > _frontier) _frontier = _index;
       _revealed = false;
       _chosen = null;
       _options = null;
@@ -324,7 +341,9 @@ class _PracticeSessionScreenState
   Widget _buildFlashcard() {
     final theme = Theme.of(context);
     if (_preparing) return const Center(child: CircularProgressIndicator());
-    final showGrades = _revealed || !_canReveal;
+    final viewOnly = _index < _frontier;
+    final pastGrade = _flashGrades[_index];
+    final showGrades = !viewOnly && (_revealed || !_canReveal);
     return Column(
       children: [
         Expanded(
@@ -355,9 +374,13 @@ class _PracticeSessionScreenState
                     ),
                     const SizedBox(height: 14),
                     Text(
-                      showGrades
-                          ? 'How well did you recall it?'
-                          : 'Tap the card to flip',
+                      viewOnly
+                          ? (pastGrade == null
+                              ? 'Skipped · view only'
+                              : 'You rated it "${pastGrade.label}" · view only')
+                          : showGrades
+                              ? 'How well did you recall it?'
+                              : 'Tap the card to flip',
                       style: theme.textTheme.bodySmall,
                     ),
                   ],
@@ -367,7 +390,7 @@ class _PracticeSessionScreenState
           ),
         ),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: showGrades
               ? Row(
                   children: [
@@ -384,6 +407,25 @@ class _PracticeSessionScreenState
                   ],
                 )
               : const SizedBox.shrink(),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: Row(
+            children: [
+              TextButton.icon(
+                onPressed: _index > 0 ? () => _goToCard(_index - 1) : null,
+                icon: const Icon(Icons.chevron_left),
+                label: const Text('Previous'),
+              ),
+              const Spacer(),
+              TextButton.icon(
+                onPressed: () => _goToCard(_index + 1),
+                iconAlignment: IconAlignment.end,
+                icon: const Icon(Icons.chevron_right),
+                label: Text(_index + 1 >= _queue.length ? 'Finish' : 'Next'),
+              ),
+            ],
+          ),
         ),
       ],
     );
