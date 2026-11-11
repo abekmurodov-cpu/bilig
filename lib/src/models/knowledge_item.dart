@@ -117,6 +117,24 @@ class KnowledgeItem {
   bool get hasMcOptions =>
       mcAnswer != null && mcAnswer!.trim().isNotEmpty && mcDistractors.isNotEmpty;
 
+  /// True when practice still lacks a cached AI quiz for this note: no option
+  /// set yet, or a content note (anything but a question) without its reworded
+  /// [quizQuestion].
+  bool get needsQuiz =>
+      front.trim().isNotEmpty &&
+      (!hasMcOptions ||
+          (type != KnowledgeType.question &&
+              (quizQuestion == null || quizQuestion!.trim().isEmpty)));
+
+  /// This note with its cached AI quiz dropped, so it gets regenerated. Used
+  /// when the note's content is edited and the old quiz no longer matches.
+  KnowledgeItem withoutQuiz() => KnowledgeItem.fromMap({
+        ...toMap(),
+        'quizQuestion': null,
+        'mcAnswer': null,
+        'mcDistractors': const <String>[],
+      });
+
   /// True once at least one code drill has been pre-generated for this note.
   bool get hasCodeDrills =>
       fillBlankAnswers.isNotEmpty || reorderSegments.length > 1;

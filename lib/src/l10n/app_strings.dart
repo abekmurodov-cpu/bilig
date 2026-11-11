@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
+import '../llm/quiz_prep.dart';
 import '../models/knowledge_item.dart';
 import '../practice/practice_models.dart';
 import '../scheduler/spaced_repetition.dart';
@@ -232,6 +233,54 @@ class AppStrings {
       'Hozircha takrorlanadigan narsa yo‘q.', 'Сейчас нечего повторять.');
   String reviewed(int n) => _t('Reviewed $n. Nice work.',
       '$n ta takrorlandi. Barakalla!', 'Повторено: $n. Отличная работа!');
+  String get preparingQuestions => _t('Preparing questions…',
+      'Savollar tayyorlanmoqda…', 'Готовим вопросы…');
+  String get startNow => _t('Start now', 'Hozir boshlash', 'Начать сейчас');
+  String get showAnswer => _t('Show answer', 'Javobni ko‘rsatish', 'Показать ответ');
+  String get noAiQuestion => _t(
+        'No AI question for this note yet. Reveal the answer and grade yourself.',
+        'Bu qayd uchun hali AI savoli yo‘q. Javobni oching va o‘zingizni baholang.',
+        'Для этой заметки ещё нет вопроса от ИИ. Откройте ответ и оцените себя.',
+      );
+  String get noAnswerToCheck => _t(
+        'This note has no answer to check against yet. Reveal it and grade yourself.',
+        'Bu qaydda tekshirish uchun javob hali yo‘q. Oching va o‘zingizni baholang.',
+        'У этой заметки пока нет ответа для проверки. Откройте её и оцените себя.',
+      );
+  String get checkedWithoutAi => _t(
+        'Checked by text match (AI unavailable).',
+        'Matn bo‘yicha tekshirildi (AI mavjud emas).',
+        'Проверено по совпадению текста (ИИ недоступен).',
+      );
+  String aiPauseReason(AiPause p) => switch (p) {
+        AiPause.rateLimited => _t('The AI is busy (too many requests).',
+            'AI band (so‘rovlar juda ko‘p).', 'ИИ занят (слишком много запросов).'),
+        AiPause.quotaExhausted => _t('Your daily AI limit is used up.',
+            'Kunlik AI limitingiz tugadi.', 'Дневной лимит ИИ исчерпан.'),
+        AiPause.auth => _t('Your AI key was rejected. Check it in Settings.',
+            'AI kalitingiz qabul qilinmadi. Sozlamalarda tekshiring.',
+            'Ключ ИИ отклонён. Проверьте его в настройках.'),
+        AiPause.network => _t('No connection to the AI.', 'AI bilan aloqa yo‘q.',
+            'Нет связи с ИИ.'),
+        AiPause.error => _t('The AI is having trouble.', 'AI ishlashida muammo bor.',
+            'У ИИ временные проблемы.'),
+      };
+  String get aiPauseFallback => _t(
+        'Notes without an AI question are shown as self-check cards for now.',
+        'AI savoli yo‘q qaydlar hozircha o‘z-o‘zini tekshirish kartasi sifatida ko‘rsatiladi.',
+        'Заметки без вопроса от ИИ пока показываются как карточки самопроверки.',
+      );
+  String aiQuestionsReady(int ready, int total) => _t(
+        'AI questions ready for $ready of $total notes',
+        'AI savollari $total ta qayddan $ready tasi uchun tayyor',
+        'Вопросы от ИИ готовы для $ready из $total '
+            '${_ruPlural(total, 'заметки', 'заметок', 'заметок')}',
+      );
+  String get preparingInBackground => _t('Preparing in the background…',
+      'Fonda tayyorlanmoqda…', 'Готовим в фоне…');
+  String get prepareNow => _t('Prepare now', 'Hozir tayyorlash', 'Подготовить сейчас');
+  String resumesAt(String time) =>
+      _t('Retrying at $time', '$time da qayta uriniladi', 'Повтор в $time');
   String get noMatch => _t('No notes match this selection.',
       'Bu tanlovga mos qaydlar yo‘q.', 'Нет заметок для этого выбора.');
   String get method => _t('Method', 'Usul', 'Метод');

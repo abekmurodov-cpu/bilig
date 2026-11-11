@@ -1,10 +1,13 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import 'package:flutter/foundation.dart';
-
 import '../../l10n/app_strings.dart';
+import '../../llm/llm_provider.dart';
 import '../../llm/llm_providers.dart';
+import '../../llm/quiz_prep.dart';
 import '../../models/knowledge_item.dart';
 import '../../practice/answer_matching.dart';
 import '../../practice/code_drills.dart';
@@ -43,9 +46,14 @@ class _PracticeSessionScreenState
   int _index = 0;
   int _correctCount = 0;
 
-  // Prep (AI answer/quiz generation) in flight for the current card.
+  // Prep (code drills, option set) in flight for the current card.
   bool _preparing = false;
-  // Flashcard state.
+  // Waiting for the first batch of AI questions before the first card.
+  bool _warmingUp = false;
+  // The current card has no usable quiz for its mode, so it is shown as a
+  // reveal-and-grade-yourself card instead of a broken question.
+  bool _selfCheck = false;
+  // Flashcard (and self-check) state.
   bool _revealed = false;
   // Furthest card reached. Cards before it were graded or skipped and are
   // view-only when revisited with "Previous".
@@ -68,9 +76,50 @@ class _PracticeSessionScreenState
   String? _feedback;
   bool _grading = false;
 
+  /// How long practice waits for AI questions before starting anyway.
+  static const _warmUpLimit = Duration(seconds: 25);
+
+  bool get _usesQuiz => switch (widget.config.method) {
+        PracticeMethod.multipleChoice ||
+        PracticeMethod.flashcard ||
+        PracticeMethod.typeAnswer =>
+          true,
+        _ => false,
+      };
+
   @override
   void initState() {
     super.initState();
+    final prep = ref.read(quizPrepProvider);
+    final batch = ref.read(quizPrepConfigProvider).batchSize;
+    _warmingUp = _usesQuiz &&
+        ref.read(llmProvider) != null &&
+        !prep.isPaused &&
+        _queue.take(batch).any((i) => i.needsQuiz);
+    if (_warmingUp) {
+      _warmUp();
+    } else {
+      _prepareItem();
+    }
+  }
+
+  /// Asks the background generator to do this session's first cards first
+  /// (one request), then starts. Later cards fill in while the user works.
+  Future<void> _warmUp() async {
+    try {
+      await ref
+          .read(quizPrepProvider.notifier)
+          .prepare(_queue)
+          .timeout(_warmUpLimit);
+    } on TimeoutException {
+      // Start anyway; cards without a quiz fall back to self-check.
+    }
+    if (!mounted || !_warmingUp) return; // the user already tapped "Start now"
+    _startAfterWarmUp();
+  }
+
+  void _startAfterWarmUp() {
+    setState(() => _warmingUp = false);
     _prepareItem();
   }
 
@@ -98,22 +147,24 @@ class _PracticeSessionScreenState
     setState(() => _queue[_index] = updated);
   }
 
-  /// Prepares the current card: generate + cache a quiz (a reworded question for
-  /// bare facts, a concise answer, and wrong options) when an LLM is attached,
-  /// then build the multiple-choice option set.
+  /// Prepares the current card from the note's cached quiz (generated ahead of
+  /// time by [QuizPrep] — practice itself never calls the AI for questions),
+  /// then builds the multiple-choice option set.
   Future<void> _prepareItem() async {
+    _syncFromStore();
     setState(() {
       _preparing = true;
+      _selfCheck = false;
       _options = null;
       _correctOption = null;
     });
     switch (widget.config.method) {
       case PracticeMethod.multipleChoice:
-        await _ensureQuiz();
         _buildOptions();
       case PracticeMethod.flashcard:
+        break;
       case PracticeMethod.typeAnswer:
-        await _ensureQuiz();
+        _selfCheck = !_canReveal;
       case PracticeMethod.fillBlank:
       case PracticeMethod.reorder:
         await _ensureDrills();
@@ -160,39 +211,21 @@ class _PracticeSessionScreenState
     return listEquals(order, identity) ? order.reversed.toList() : order;
   }
 
-  /// Generates and caches a quiz for the current note when one isn't stored yet
-  /// and an LLM is attached. Facts get a reworded [quizQuestion] so practice
-  /// asks a real question instead of echoing the fact; the answer is cached so
-  /// answer-less facts become practiceable and future runs are instant.
-  Future<void> _ensureQuiz() async {
-    // Non-question notes need a reworded prompt; regenerate if an older cached
-    // quiz predates that (has options but no quizQuestion).
-    final missingQuestion = _item.type != KnowledgeType.question &&
-        (_item.quizQuestion == null || _item.quizQuestion!.trim().isEmpty);
-    if (_item.hasMcOptions && !missingQuestion) return;
-    final llm = ref.read(llmProvider);
-    if (llm == null) return;
-    try {
-      final quiz = await llm.generateQuiz(_item);
-      var updated = _item.copyWith(
-        mcAnswer: quiz.answer,
-        mcDistractors: quiz.distractors,
-        back: _item.hasAnswer ? _item.back : quiz.answer,
-      );
-      // Reword the shown prompt for any content note (fact, code, command,
-      // concept); notes already phrased as a question keep their own wording.
-      if (_item.type != KnowledgeType.question) {
-        updated = updated.copyWith(quizQuestion: quiz.question);
+  /// Picks up the latest stored copy of the current note: the background
+  /// generator may have cached its quiz since the session started.
+  void _syncFromStore() {
+    final items = ref.read(knowledgeListProvider).asData?.value ?? const [];
+    for (final fresh in items) {
+      if (fresh.id == _item.id) {
+        _queue[_index] = fresh;
+        return;
       }
-      _setItem(updated);
-      await ref.read(knowledgeListProvider.notifier).persist(updated);
-    } catch (_) {
-      // Fall back to non-AI behavior (local distractors / raw prompt).
     }
   }
 
-  /// Builds [_options]/[_correctOption] from the cached quiz, or from distractors
-  /// drawn from other notes when no quiz is available.
+  /// Builds [_options]/[_correctOption] from the cached AI quiz. Without one,
+  /// options are borrowed from other notes only when that can't look silly;
+  /// otherwise the card becomes a self-check card.
   void _buildOptions() {
     final String correct;
     final List<String> distractors;
@@ -200,14 +233,52 @@ class _PracticeSessionScreenState
       correct = _item.mcAnswer!;
       distractors = _item.mcDistractors;
     } else {
-      correct = _item.mcAnswer ?? _item.back ?? _item.front;
-      distractors = _localDistractors(_item);
+      final local = _localDistractors(_item);
+      if (local.length < 2) {
+        setState(() => _selfCheck = true);
+        return;
+      }
+      correct = _item.back!.trim();
+      distractors = local;
     }
     final options = <String>{correct, ...distractors}.toList()..shuffle();
     setState(() {
       _correctOption = correct;
       _options = options;
     });
+  }
+
+  /// Longest answer that still reads as a multiple-choice option.
+  static const _maxLocalOptionLength = 120;
+
+  /// Wrong options borrowed from other notes' answers. Only for notes whose
+  /// prompt is a real cue (a question, a concept name, a command) and only from
+  /// short answers of the same kind, preferring the same category — so options
+  /// are comparable instead of a random mix of facts and code.
+  List<String> _localDistractors(KnowledgeItem item) {
+    const promptTypes = {
+      KnowledgeType.question,
+      KnowledgeType.concept,
+      KnowledgeType.command,
+    };
+    bool short(KnowledgeItem i) =>
+        i.hasAnswer && i.back!.trim().length <= _maxLocalOptionLength;
+    if (!promptTypes.contains(item.type) || !short(item)) return const [];
+    final answer = normalizeAnswer(item.back!);
+    final pool = ref
+        .read(notesSortedProvider)
+        .where((i) =>
+            i.id != item.id &&
+            i.type == item.type &&
+            short(i) &&
+            similarity(normalizeAnswer(i.back!), answer) < 0.8)
+        .toList();
+    pool.sort((a, b) {
+      final aSame = a.category == item.category ? 0 : 1;
+      final bSame = b.category == item.category ? 0 : 1;
+      return aSame.compareTo(bSame);
+    });
+    return {for (final i in pool) i.back!.trim()}.take(3).toList();
   }
 
   /// The answer to reveal / check for the current note. When the prompt was
@@ -219,20 +290,6 @@ class _PracticeSessionScreenState
           : (_item.back ?? _item.mcAnswer);
 
   bool get _canReveal => _revealAnswer?.trim().isNotEmpty ?? false;
-
-  /// Distractors drawn from other notes' answers (same category preferred).
-  List<String> _localDistractors(KnowledgeItem item) {
-    final all = ref.read(notesSortedProvider);
-    final pool = all
-        .where((i) => i.id != item.id && i.hasAnswer && i.back != item.back)
-        .toList();
-    pool.sort((a, b) {
-      final aSame = a.category == item.category ? 0 : 1;
-      final bSame = b.category == item.category ? 0 : 1;
-      return aSame.compareTo(bSame);
-    });
-    return pool.take(3).map((i) => i.back!).toList();
-  }
 
   Future<void> _grade(ReviewGrade grade) async {
     _flashGrades[_index] = grade;
@@ -272,6 +329,7 @@ class _PracticeSessionScreenState
       _index++;
       if (_index > _frontier) _frontier = _index;
       _revealed = false;
+      _selfCheck = false;
       _chosen = null;
       _options = null;
       _correctOption = null;
@@ -287,17 +345,39 @@ class _PracticeSessionScreenState
   @override
   Widget build(BuildContext context) {
     final done = _index >= _queue.length;
+    final prep = ref.watch(quizPrepProvider);
+    final showPause = !done &&
+        !_warmingUp &&
+        _usesQuiz &&
+        prep.isPaused &&
+        ref.watch(llmProvider) != null &&
+        _item.needsQuiz;
     return Scaffold(
       appBar: AppBar(
         title: Text(done
             ? context.s.done
             : '${context.s.methodLabel(widget.config.method)}  ${_index + 1}/${_queue.length}'),
       ),
-      body: done ? _buildDone() : _buildBody(),
+      body: done
+          ? _buildDone()
+          : Column(
+              children: [
+                if (showPause) _PauseBanner(pause: prep.pause!),
+                Expanded(child: _buildBody()),
+              ],
+            ),
     );
   }
 
   Widget _buildBody() {
+    if (_warmingUp) return _buildWarmUp();
+    if (_selfCheck) {
+      return _buildSelfCheck(
+        widget.config.method == PracticeMethod.typeAnswer
+            ? context.s.noAnswerToCheck
+            : context.s.noAiQuestion,
+      );
+    }
     return switch (widget.config.method) {
       PracticeMethod.flashcard => _buildFlashcard(),
       PracticeMethod.multipleChoice => _buildMultipleChoice(),
@@ -335,6 +415,101 @@ class _PracticeSessionScreenState
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildWarmUp() {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 16),
+          Text(context.s.preparingQuestions,
+              style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _startAfterWarmUp,
+            child: Text(context.s.startNow),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Again / Hard / Good / Easy. Labels shrink rather than wrap mid-word
+  /// (Russian ones are long for a quarter of a phone's width).
+  Widget _gradeRow() {
+    return Row(
+      children: [
+        for (final grade in ReviewGrade.values)
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: OutlinedButton(
+                style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 6)),
+                onPressed: () => _grade(grade),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(context.s.grade(grade), maxLines: 1),
+                ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  // --- Self-check (no usable quiz for this card) --------------------------
+  Widget _buildSelfCheck(String hint) {
+    final theme = Theme.of(context);
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            child: _promptCard(
+              context,
+              extra: _revealed
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Divider(),
+                          const SizedBox(height: 8),
+                          Text(context.s.answerLabel,
+                              style: theme.textTheme.labelSmall?.copyWith(
+                                  letterSpacing: 1.2,
+                                  color: theme.colorScheme.primary)),
+                          const SizedBox(height: 8),
+                          Text(_revealAnswer ?? context.s.noAnswerRecorded,
+                              style: theme.textTheme.titleMedium),
+                        ],
+                      ),
+                    )
+                  : null,
+            ),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Text(_revealed ? context.s.howWell : hint,
+              textAlign: TextAlign.center, style: theme.textTheme.bodySmall),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+          child: _revealed
+              ? _gradeRow()
+              : SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () => setState(() => _revealed = true),
+                    child: Text(context.s.showAnswer),
+                  ),
+                ),
+        ),
+      ],
     );
   }
 
@@ -393,20 +568,7 @@ class _PracticeSessionScreenState
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
           child: showGrades
-              ? Row(
-                  children: [
-                    for (final grade in ReviewGrade.values)
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: OutlinedButton(
-                            onPressed: () => _grade(grade),
-                            child: Text(context.s.grade(grade)),
-                          ),
-                        ),
-                      ),
-                  ],
-                )
+              ? _gradeRow()
               : const SizedBox.shrink(),
         ),
         Padding(
@@ -537,11 +699,23 @@ class _PracticeSessionScreenState
     );
   }
 
+  /// The AI, unless none is attached or AI work is paused (rate limit, bad
+  /// key, offline) — then grading goes straight to the on-device check.
+  LlmProvider? get _gradingLlm =>
+      ref.read(quizPrepProvider).isPaused ? null : ref.read(llmProvider);
+
   Future<void> _checkTyped() async {
+    final strings = context.s;
     final guess = _answerController.text.trim();
     if (guess.isEmpty) return;
     final expected = _revealAnswer ?? '';
-    final llm = ref.read(llmProvider);
+    // A clear match needs no AI request.
+    if (isConfidentlyCorrect(guess, expected)) {
+      await _submitObjective(true);
+      return;
+    }
+    final llm = _gradingLlm;
+    final aiAttached = ref.read(llmProvider) != null;
     setState(() => _grading = true);
     bool correct;
     String? feedback;
@@ -550,11 +724,16 @@ class _PracticeSessionScreenState
         final grade = await llm.gradeAnswer(_item, guess);
         correct = grade.correct;
         feedback = grade.feedback;
-      } catch (_) {
+      } catch (e) {
+        if (e is LlmException) {
+          ref.read(quizPrepProvider.notifier).reportError(e);
+        }
         correct = isAnswerCorrect(guess, expected);
+        feedback = strings.checkedWithoutAi;
       }
     } else {
       correct = isAnswerCorrect(guess, expected);
+      if (aiAttached) feedback = strings.checkedWithoutAi;
     }
     if (!mounted) return;
     setState(() => _grading = false);
@@ -658,7 +837,12 @@ class _PracticeSessionScreenState
     final submitted = _codeController.text;
     if (submitted.trim().isEmpty) return;
     final reference = _item.back ?? '';
-    final llm = ref.read(llmProvider);
+    // An equivalent match needs no AI request.
+    if (codeMatches(submitted, reference)) {
+      await _submitObjective(true);
+      return;
+    }
+    final llm = _gradingLlm;
     setState(() => _grading = true);
     bool correct;
     String? feedback;
@@ -667,10 +851,16 @@ class _PracticeSessionScreenState
         final g = await llm.gradeCode(_item, submitted);
         correct = g.correct;
         feedback = g.feedback;
-      } catch (_) {
-        correct = codeMatches(submitted, reference);
+      } catch (e) {
+        if (e is LlmException) {
+          ref.read(quizPrepProvider.notifier).reportError(e);
+        }
+        correct = false;
         feedback = strings.aiCheckFailed;
       }
+    } else if (ref.read(llmProvider) != null) {
+      correct = false;
+      feedback = strings.aiCheckFailed;
     } else {
       correct = codeMatches(submitted, reference);
       feedback = correct
@@ -1011,6 +1201,37 @@ class _OptionTile extends StatelessWidget {
                 ? const Icon(Icons.close, color: Color(0xFFD64545))
                 : null),
         onTap: onTap,
+      ),
+    );
+  }
+}
+
+/// Thin notice that AI questions are paused, and what practice does meanwhile.
+class _PauseBanner extends StatelessWidget {
+  const _PauseBanner({required this.pause});
+
+  final AiPause pause;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Material(
+      color: scheme.tertiaryContainer,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+        child: Row(
+          children: [
+            Icon(Icons.cloud_off_outlined,
+                size: 20, color: scheme.onTertiaryContainer),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                '${context.s.aiPauseReason(pause)} ${context.s.aiPauseFallback}',
+                style: TextStyle(color: scheme.onTertiaryContainer, fontSize: 13),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

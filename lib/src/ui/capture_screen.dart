@@ -25,10 +25,6 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
   bool _saving = false;
   bool _aiBusy = false;
   Uint8List? _imageBytes;
-  // Pre-generated quiz, cached when the answer is AI-generated.
-  String? _quizQuestion;
-  String? _mcAnswer;
-  List<String> _mcDistractors = const [];
 
   @override
   void dispose() {
@@ -55,21 +51,10 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
         createdAt: now,
         dueDate: now,
       );
-      // Fill the detailed answer, then pre-build a concise MC quiz to cache.
+      // Only the answer is generated here; the practice quiz is batched in
+      // the background after saving (see QuizPrep), saving a request.
       final answer = await llm.expandNote(probe);
       if (mounted) _backController.text = answer;
-      try {
-        final quiz = await llm.generateQuiz(probe.copyWith(back: answer));
-        _mcAnswer = quiz.answer;
-        _mcDistractors = quiz.distractors;
-        // Reword content notes (fact, code, command, concept) into a real
-        // question so practice asks it instead of echoing the note. Notes
-        // already phrased as a question keep their own prompt.
-        _quizQuestion =
-            _type != KnowledgeType.question ? quiz.question : null;
-      } catch (_) {
-        // Non-fatal: the quiz will be generated lazily during practice.
-      }
     } catch (e) {
       _showError(strings.couldNotGenerate(e));
     } finally {
@@ -112,9 +97,6 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
           type: _type,
           category: _categoryController.text,
           imageBytes: _imageBytes,
-          quizQuestion: _quizQuestion,
-          mcAnswer: _mcAnswer,
-          mcDistractors: _mcDistractors,
         );
     if (mounted) Navigator.of(context).pop();
   }

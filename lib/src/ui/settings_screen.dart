@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../l10n/app_strings.dart';
 import '../llm/llm_providers.dart';
+import '../llm/quiz_prep.dart';
 import '../notifications/notification_providers.dart';
 import '../providers/knowledge_providers.dart';
 import '../providers/settings_providers.dart';
@@ -240,6 +241,8 @@ class _LlmSectionState extends ConsumerState<_LlmSection> {
                       ),
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  const _QuizPrepStatus(),
                 ],
               )
             : Column(
@@ -273,6 +276,68 @@ class _LlmSectionState extends ConsumerState<_LlmSection> {
                 ],
               ),
       ),
+    );
+  }
+}
+
+/// How many notes have their AI practice question ready, whether generation
+/// is running or paused (and why), with a manual "Prepare now".
+class _QuizPrepStatus extends ConsumerWidget {
+  const _QuizPrepStatus();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final prep = ref.watch(quizPrepProvider);
+    final notes = (ref.watch(knowledgeListProvider).asData?.value ?? const [])
+        .where((i) => i.front.trim().isNotEmpty)
+        .toList();
+    final ready = notes.where((i) => !i.needsQuiz).length;
+    final theme = Theme.of(context);
+    final small = theme.textTheme.bodySmall;
+
+    final String? detail;
+    if (prep.running) {
+      detail = context.s.preparingInBackground;
+    } else if (prep.isPaused) {
+      final until = prep.pausedUntil;
+      detail = until == null
+          ? context.s.aiPauseReason(prep.pause!)
+          : '${context.s.aiPauseReason(prep.pause!)} '
+              '${context.s.resumesAt(TimeOfDay.fromDateTime(until).format(context))}';
+    } else {
+      detail = null;
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(context.s.aiQuestionsReady(ready, notes.length)),
+        if (detail != null) ...[
+          const SizedBox(height: 2),
+          Row(
+            children: [
+              if (prep.running) ...[
+                const SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Expanded(child: Text(detail, style: small)),
+            ],
+          ),
+        ],
+        if (!prep.running && ready < notes.length)
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () => ref.read(quizPrepProvider.notifier).retryNow(),
+              icon: const Icon(Icons.auto_awesome, size: 18),
+              label: Text(context.s.prepareNow),
+            ),
+          ),
+      ],
     );
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../l10n/app_strings.dart';
+import '../llm/quiz_prep.dart';
 import '../providers/knowledge_providers.dart';
 import '../sync/sync_providers.dart';
 import 'home_screen.dart';
@@ -49,6 +50,8 @@ class _AppShellState extends ConsumerState<AppShell> {
 
   @override
   Widget build(BuildContext context) {
+    // Keeps the background quiz generator alive for the whole session.
+    ref.listen(quizPrepProvider, (_, _) {});
     return Scaffold(
       body: IndexedStack(index: _index, children: _tabs),
       bottomNavigationBar: NavigationBar(

@@ -82,6 +82,15 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
     await _refresh();
   }
 
+  /// Persists several items with a single list refresh (for batch AI results).
+  Future<void> persistAll(Iterable<KnowledgeItem> items) async {
+    final now = DateTime.now();
+    for (final item in items) {
+      await _repo.save(item.copyWith(updatedAt: now));
+    }
+    await _refresh();
+  }
+
   /// Attaches (or replaces) an image on an existing note.
   Future<void> setImage(KnowledgeItem item, Uint8List bytes) async {
     await _images.putBytes(item.id, bytes);
@@ -112,7 +121,12 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
     required KnowledgeType type,
     String? category,
   }) async {
-    final updated = item.copyWith(
+    final contentChanged = item.front != front.trim() ||
+        (item.back ?? '') != (back?.trim() ?? '') ||
+        item.type != type;
+    // A cached quiz written for the old wording would now be wrong.
+    final base = contentChanged ? item.withoutQuiz() : item;
+    final updated = base.copyWith(
       front: front.trim(),
       back: back?.trim().isEmpty ?? true ? null : back!.trim(),
       type: type,

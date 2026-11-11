@@ -24,11 +24,43 @@ class McQuiz {
   final List<String> distractors;
 }
 
+/// Why an LLM call failed, so callers can react (pause, tell the user) instead
+/// of silently degrading.
+enum LlmErrorKind {
+  /// Too many requests right now; retry after [LlmException.retryAfter].
+  rateLimited,
+
+  /// The daily / billing quota is used up; retrying today won't help.
+  quotaExhausted,
+
+  /// The key was rejected.
+  auth,
+
+  /// No connection or the request timed out.
+  network,
+
+  /// The model answered, but not in a usable shape.
+  badResponse,
+
+  /// Anything else (server error, bad model name, ...).
+  other,
+}
+
+class LlmException implements Exception {
+  const LlmException(this.kind, this.message, {this.retryAfter});
+
+  final LlmErrorKind kind;
+  final String message;
+  final Duration? retryAfter;
+
+  @override
+  String toString() => message;
+}
+
 /// Abstraction over a large-language-model backend. Implementations are
 /// attached/detached at runtime by the user (starting with Gemini). Every
-/// method may throw on network/credential errors — callers treat the LLM as a
-/// best-effort enhancement and fall back to non-LLM behavior when it is absent
-/// or fails.
+/// method may throw — preferably an [LlmException] — and callers treat the LLM
+/// as a best-effort enhancement with a non-LLM fallback.
 abstract class LlmProvider {
   /// Human-readable name of the attached model/provider (for settings UI).
   String get displayName;
@@ -41,6 +73,13 @@ abstract class LlmProvider {
   /// plus [distractorCount] short wrong options. Works even when the note has no
   /// recorded answer yet (it reasons from the prompt).
   Future<McQuiz> generateQuiz(KnowledgeItem item, {int distractorCount = 3});
+
+  /// Builds quizzes for several notes in **one** request, keyed by note id.
+  /// Notes the model skipped or garbled are simply absent from the result.
+  Future<Map<String, McQuiz>> generateQuizzes(
+    List<KnowledgeItem> items, {
+    int distractorCount = 3,
+  });
 
   /// Judges whether [answer] is a correct response to [item].
   Future<LlmGrade> gradeAnswer(KnowledgeItem item, String answer);
