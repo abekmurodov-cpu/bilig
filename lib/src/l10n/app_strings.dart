@@ -243,6 +243,18 @@ class AppStrings {
         'Mos model topilmadi. Model nomini yozing.',
         'Подходящая модель не найдена. Введите название модели.',
       );
+  String get addBackup =>
+      _t('Add a backup AI', 'Zaxira AI qo‘shish', 'Добавить резервный ИИ');
+  String get backupBlurb => _t(
+        'A backup AI is used automatically when the main one hits its limit '
+            'or stops working.',
+        'Zaxira AI asosiysi limitga yetganda yoki ishlamay qolganda '
+            'avtomatik ishlatiladi.',
+        'Резервный ИИ используется автоматически, когда основной упирается '
+            'в лимит или перестаёт работать.',
+      );
+  String backupLabel(String name, String model) =>
+      _t('Backup: $name · $model', 'Zaxira: $name · $model', 'Резерв: $name · $model');
   String get otherModel => _t('Other model…', 'Boshqa model…', 'Другая модель…');
   String get refreshModels => _t('Refresh model list',
       'Modellar ro‘yxatini yangilash', 'Обновить список моделей');
@@ -300,6 +312,14 @@ class AppStrings {
       'Hozircha takrorlanadigan narsa yo‘q.', 'Сейчас нечего повторять.');
   String reviewed(int n) => _t('Reviewed $n. Nice work.',
       '$n ta takrorlandi. Barakalla!', 'Повторено: $n. Отличная работа!');
+  String get badQuestion => _t('Bad question', 'Yomon savol', 'Плохой вопрос');
+  String get badQuestionThanks => _t(
+        'Thanks. This question won’t be asked again.',
+        'Rahmat. Bu savol boshqa berilmaydi.',
+        'Спасибо. Этот вопрос больше не появится.',
+      );
+  String get answerNotCounted => _t('Your answer to it doesn’t count.',
+      'Unga bergan javobingiz hisobga olinmaydi.', 'Ваш ответ на него не засчитан.');
   String get preparingQuestions => _t('Preparing questions…',
       'Savollar tayyorlanmoqda…', 'Готовим вопросы…');
   String get startNow => _t('Start now', 'Hozir boshlash', 'Начать сейчас');

@@ -212,8 +212,11 @@ class _PracticeSessionScreenState
   }
 
   /// Picks up the latest stored copy of the current note: the background
-  /// generator may have cached its quiz since the session started.
+  /// generator may have cached its quiz since the session started. Cards
+  /// already answered keep the copy they were shown with, so revisiting one
+  /// shows the same question (the active question rotates after a grade).
   void _syncFromStore() {
+    if (_index < _frontier) return;
     final items = ref.read(knowledgeListProvider).asData?.value ?? const [];
     for (final fresh in items) {
       if (fresh.id == _item.id) {
@@ -229,9 +232,10 @@ class _PracticeSessionScreenState
   void _buildOptions() {
     final String correct;
     final List<String> distractors;
-    if (_item.hasMcOptions) {
-      correct = _item.mcAnswer!;
-      distractors = _item.mcDistractors;
+    final quiz = _item.activeQuiz;
+    if (quiz != null) {
+      correct = quiz.answer;
+      distractors = quiz.distractors;
     } else {
       final local = _localDistractors(_item);
       if (local.length < 2) {
@@ -281,13 +285,49 @@ class _PracticeSessionScreenState
     return {for (final i in pool) i.back!.trim()}.take(3).toList();
   }
 
-  /// The answer to reveal / check for the current note. When the prompt was
-  /// reworded into a generated question, the matching answer is the concise
-  /// [mcAnswer]; otherwise prefer the note's own detailed [back].
-  String? get _revealAnswer =>
-      (_item.quizQuestion != null && _item.quizQuestion!.trim().isNotEmpty)
-          ? (_item.mcAnswer ?? _item.back)
-          : (_item.back ?? _item.mcAnswer);
+  /// The answer to reveal / check for the current note. When the prompt is a
+  /// reworded AI question, the matching answer is that question's concise
+  /// answer; otherwise prefer the note's own detailed [back].
+  String? get _revealAnswer {
+    final quiz = _item.activeQuiz;
+    final reworded = quiz?.question?.trim().isNotEmpty ?? false;
+    return reworded ? quiz!.answer : (_item.back ?? quiz?.answer);
+  }
+
+  /// Whether the card on screen shows an AI question the student can flag.
+  bool get _canFlag =>
+      !_warmingUp &&
+      !_selfCheck &&
+      _usesQuiz &&
+      _index < _queue.length &&
+      _index >= _frontier &&
+      _item.activeQuiz != null;
+
+  /// "Bad question": drops the question shown, skips the card, and — if it
+  /// was already answered — undoes that grade, since a bad question shouldn't
+  /// count. The background generator writes new ones once none are left.
+  Future<void> _flagQuestion() async {
+    final strings = context.s;
+    final messenger = ScaffoldMessenger.of(context);
+    final answered = _wasCorrect != null;
+    if (_wasCorrect == true) _correctCount--;
+    // _item is the copy as shown, from before any grade (grading saves a new
+    // copy but doesn't touch the queue), so saving it also undoes the grade.
+    await ref
+        .read(knowledgeListProvider.notifier)
+        .persist(_item.dropActiveQuiz());
+    messenger.showSnackBar(SnackBar(
+      content: Text(answered
+          ? '${strings.badQuestionThanks} ${strings.answerNotCounted}'
+          : strings.badQuestionThanks),
+    ));
+    if (!mounted) return;
+    if (widget.config.method == PracticeMethod.flashcard) {
+      _goToCard(_index + 1);
+    } else {
+      _advance();
+    }
+  }
 
   bool get _canReveal => _revealAnswer?.trim().isNotEmpty ?? false;
 
@@ -357,6 +397,14 @@ class _PracticeSessionScreenState
         title: Text(done
             ? context.s.done
             : '${context.s.methodLabel(widget.config.method)}  ${_index + 1}/${_queue.length}'),
+        actions: [
+          if (!done && _canFlag)
+            IconButton(
+              tooltip: context.s.badQuestion,
+              icon: const Icon(Icons.thumb_down_alt_outlined),
+              onPressed: _flagQuestion,
+            ),
+        ],
       ),
       body: done
           ? _buildDone()

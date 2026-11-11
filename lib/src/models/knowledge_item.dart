@@ -18,6 +18,32 @@ enum KnowledgeType {
       };
 }
 
+/// One AI-written practice question for a note: a [question] (null for notes
+/// that are already a question — their own wording is used), its short
+/// [answer], and wrong options.
+class QuizVariant {
+  const QuizVariant({this.question, required this.answer, required this.distractors});
+
+  final String? question;
+  final String answer;
+  final List<String> distractors;
+
+  Map<String, dynamic> toMap() =>
+      {'question': question, 'answer': answer, 'distractors': distractors};
+
+  static QuizVariant? fromMap(Object? map) {
+    if (map is! Map) return null;
+    final answer = map['answer'];
+    final distractors = map['distractors'];
+    if (answer is! String || distractors is! List) return null;
+    return QuizVariant(
+      question: map['question'] as String?,
+      answer: answer,
+      distractors: [for (final d in distractors) '$d'],
+    );
+  }
+}
+
 /// A single unit of knowledge the user wants to keep alive.
 ///
 /// [front] is what the app shows first when quizzing (a question, a concept
@@ -47,6 +73,8 @@ class KnowledgeItem {
     this.fillBlankTemplate,
     this.fillBlankAnswers = const [],
     this.reorderSegments = const [],
+    this.extraQuizzes = const [],
+    this.badQuestions = const [],
   }) : updatedAt = updatedAt ?? createdAt;
 
   final String id;
@@ -92,6 +120,17 @@ class KnowledgeItem {
   /// Three short plausible-but-wrong options paired with [mcAnswer].
   final List<String> mcDistractors;
 
+  /// More questions about the same note, so practice doesn't repeat one
+  /// wording. [quizQuestion]/[mcAnswer]/[mcDistractors] stay the first one
+  /// (that's what older app versions and synced copies understand).
+  final List<QuizVariant> extraQuizzes;
+
+  /// Questions the student flagged as bad, so the AI doesn't write them again.
+  final List<String> badQuestions;
+
+  /// Most flagged questions remembered per note.
+  static const int maxBadQuestions = 5;
+
   // --- Pre-generated code drills (code notes only; no LLM at practice) ---
   /// The code with blanks replaced by «0», «1», … placeholders, paired with
   /// [fillBlankAnswers]. Used by the fill-in-the-blank coding drill.
@@ -106,12 +145,53 @@ class KnowledgeItem {
 
   bool get hasAnswer => back != null && back!.trim().isNotEmpty;
 
-  /// What practice shows as the prompt: the generated [quizQuestion] if present,
-  /// otherwise the raw [front].
-  String get practicePrompt =>
-      (quizQuestion != null && quizQuestion!.trim().isNotEmpty)
-          ? quizQuestion!
-          : front;
+  /// Every cached question, the stored first one included.
+  List<QuizVariant> get quizVariants => [
+        if (hasMcOptions)
+          QuizVariant(question: quizQuestion, answer: mcAnswer!, distractors: mcDistractors),
+        ...extraQuizzes,
+      ];
+
+  /// Index of the question practice asks now. It moves on with every review
+  /// (a correct one raises [repetitions], a lapse raises [lapses]), so the
+  /// note is asked a different way next time.
+  int get _activeIndex {
+    final n = quizVariants.length;
+    return n == 0 ? 0 : (repetitions + lapses) % n;
+  }
+
+  /// The question practice asks now, or null when none is cached.
+  QuizVariant? get activeQuiz {
+    final variants = quizVariants;
+    return variants.isEmpty ? null : variants[_activeIndex];
+  }
+
+  /// What practice shows as the prompt: the active question if it rewords the
+  /// note, otherwise the raw [front].
+  String get practicePrompt {
+    final q = activeQuiz?.question;
+    return (q != null && q.trim().isNotEmpty) ? q : front;
+  }
+
+  /// This note without its active question (flagged as bad), remembering the
+  /// wording so it isn't generated again. When it was the last question the
+  /// note needs a new quiz.
+  KnowledgeItem dropActiveQuiz() {
+    final variants = quizVariants;
+    if (variants.isEmpty) return this;
+    final dropped = variants.removeAt(_activeIndex);
+    final bad = [...badQuestions, dropped.question ?? dropped.answer];
+    final first = variants.isEmpty ? null : variants.first;
+    return KnowledgeItem.fromMap({
+      ...toMap(),
+      'quizQuestion': first?.question,
+      'mcAnswer': first?.answer,
+      'mcDistractors': first?.distractors ?? const <String>[],
+      'extraQuizzes': [for (final v in variants.skip(1)) v.toMap()],
+      'badQuestions': bad.sublist(
+          bad.length > maxBadQuestions ? bad.length - maxBadQuestions : 0),
+    });
+  }
 
   /// True once a full multiple-choice set (correct + ≥1 distractor) is cached.
   bool get hasMcOptions =>
@@ -133,6 +213,8 @@ class KnowledgeItem {
         'quizQuestion': null,
         'mcAnswer': null,
         'mcDistractors': const <String>[],
+        'extraQuizzes': const <Object>[],
+        'badQuestions': const <String>[],
       });
 
   /// True once at least one code drill has been pre-generated for this note.
@@ -165,6 +247,8 @@ class KnowledgeItem {
     String? fillBlankTemplate,
     List<String>? fillBlankAnswers,
     List<String>? reorderSegments,
+    List<QuizVariant>? extraQuizzes,
+    List<String>? badQuestions,
   }) {
     return KnowledgeItem(
       id: id,
@@ -188,6 +272,8 @@ class KnowledgeItem {
       fillBlankTemplate: fillBlankTemplate ?? this.fillBlankTemplate,
       fillBlankAnswers: fillBlankAnswers ?? this.fillBlankAnswers,
       reorderSegments: reorderSegments ?? this.reorderSegments,
+      extraQuizzes: extraQuizzes ?? this.extraQuizzes,
+      badQuestions: badQuestions ?? this.badQuestions,
     );
   }
 
@@ -213,6 +299,8 @@ class KnowledgeItem {
         'fillBlankTemplate': fillBlankTemplate,
         'fillBlankAnswers': fillBlankAnswers,
         'reorderSegments': reorderSegments,
+        'extraQuizzes': [for (final q in extraQuizzes) q.toMap()],
+        'badQuestions': badQuestions,
       };
 
   factory KnowledgeItem.fromMap(Map<String, dynamic> map) => KnowledgeItem(
@@ -249,6 +337,13 @@ class KnowledgeItem {
                 const [],
         reorderSegments:
             (map['reorderSegments'] as List?)?.map((e) => e.toString()).toList() ??
+                const [],
+        extraQuizzes: [
+          for (final q in (map['extraQuizzes'] as List?) ?? const [])
+            ?QuizVariant.fromMap(q),
+        ],
+        badQuestions:
+            (map['badQuestions'] as List?)?.map((e) => e.toString()).toList() ??
                 const [],
       );
 

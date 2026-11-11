@@ -10,6 +10,7 @@ import 'package:knowledge/src/data/secret_store.dart';
 import 'package:knowledge/src/data/settings_repository.dart';
 import 'package:knowledge/src/llm/ai_services.dart';
 import 'package:knowledge/src/llm/anthropic_provider.dart';
+import 'package:knowledge/src/llm/fallback_llm.dart';
 import 'package:knowledge/src/llm/http_llm.dart';
 import 'package:knowledge/src/llm/llm_provider.dart';
 import 'package:knowledge/src/llm/llm_providers.dart';
@@ -310,6 +311,8 @@ void main() {
         SettingsRepository.kAiModels,
         SettingsRepository.kTelegramBotToken,
         SettingsRepository.kTelegramChatId,
+        SettingsRepository.kAiBackupService,
+        SettingsRepository.kAiBackupModel,
       ]) {
         await settings.setString(k, null);
       }
@@ -364,6 +367,24 @@ void main() {
       expect(secrets.read(SecretStore.kTelegramBotToken), '123:abc');
       await c.read(telegramConfigProvider.notifier).detach();
       expect(secrets.read(SecretStore.kTelegramBotToken), isNull);
+    });
+
+    test('a backup wraps the main AI and goes away with it', () async {
+      final c = containerWith(SecretStore.memory());
+      addTearDown(c.dispose);
+      await c.read(aiConfigProvider.notifier).attach(
+          const AiConfig(service: AiService.gemini, model: 'g', apiKey: 'AIza1'));
+      expect(c.read(llmProvider), isNot(isA<FallbackLlm>()));
+
+      await c.read(backupAiProvider.notifier).attach(
+          const AiConfig(service: AiService.groq, model: 'l', apiKey: 'gsk_1'));
+      final llm = c.read(llmProvider);
+      expect(llm, isA<FallbackLlm>());
+      expect((llm as FallbackLlm).backup.displayName, 'Groq (l)');
+
+      await c.read(aiConfigProvider.notifier).detach();
+      expect(c.read(backupAiProvider), isNull);
+      expect(c.read(llmProvider), isNull);
     });
 
     test('attach, change model, detach', () async {

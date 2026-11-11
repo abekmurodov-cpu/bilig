@@ -17,20 +17,23 @@ class FakeLlm implements LlmProvider {
   Future<void> Function()? duringRequest;
 
   @override
-  Future<Map<String, McQuiz>> generateQuizzes(List<KnowledgeItem> items,
-      {int distractorCount = 3}) async {
+  Future<Map<String, List<McQuiz>>> generateQuizzes(List<KnowledgeItem> items,
+      {int distractorCount = 3, int variantCount = 3}) async {
     batches.add([for (final i in items) i.id]);
     await duringRequest?.call();
     if (failWith != null) throw failWith!;
     return {
       for (final i in items)
         i.id: garble
-            ? const McQuiz(question: 'Q?', answer: 'same', distractors: ['same', 'Same'])
-            : McQuiz(
-                question: 'What about ${i.id}?',
-                answer: 'answer ${i.id}',
-                distractors: const ['wrong one', 'wrong two', 'wrong three'],
-              ),
+            ? const [McQuiz(question: 'Q?', answer: 'same', distractors: ['same', 'Same'])]
+            : [
+                for (final angle in ['What about', 'Why', 'When'])
+                  McQuiz(
+                    question: '$angle ${i.id}?',
+                    answer: '$angle answer ${i.id}',
+                    distractors: const ['wrong one', 'wrong two', 'wrong three'],
+                  ),
+              ],
     };
   }
 
@@ -96,7 +99,8 @@ void main() {
     expect(stored(c).where((i) => i.needsQuiz), isEmpty);
     final a = stored(c).firstWhere((i) => i.id == 'a');
     expect(a.quizQuestion, 'What about a?');
-    expect(a.back, 'answer a', reason: 'answer-less notes get the answer');
+    expect(a.extraQuizzes.map((q) => q.question), ['Why a?', 'When a?']);
+    expect(a.back, 'What about answer a', reason: 'answer-less notes get the answer');
   });
 
   test('a practice queue jumps the line', () async {
@@ -162,6 +166,43 @@ void main() {
     expect(a.lastCorrect, isTrue);
     expect(a.repetitions, 1);
     expect(a.needsQuiz, isFalse);
+  });
+
+  test('the asked question rotates with each review', () async {
+    final (c, _) = await setUpWith(['a']);
+    addTearDown(c.dispose);
+    await c.read(quizPrepProvider.notifier).run();
+    final asked = <String>[];
+    for (var i = 0; i < 4; i++) {
+      final a = stored(c).single;
+      asked.add(a.practicePrompt);
+      await c.read(knowledgeListProvider.notifier).grade(a, ReviewGrade.good);
+    }
+    expect(asked, ['What about a?', 'Why a?', 'When a?', 'What about a?']);
+  });
+
+  test('flagging drops the shown question; the last one triggers a rewrite', () async {
+    final (c, llm) = await setUpWith(['a']);
+    addTearDown(c.dispose);
+    final prep = c.read(quizPrepProvider.notifier);
+    await prep.run();
+    final notifier = c.read(knowledgeListProvider.notifier);
+
+    for (final expected in ['What about a?', 'Why a?', 'When a?']) {
+      final a = stored(c).single;
+      expect(a.practicePrompt, expected);
+      await notifier.persist(a.dropActiveQuiz());
+    }
+    final a = stored(c).single;
+    expect(a.needsQuiz, isTrue);
+    expect(a.badQuestions, ['What about a?', 'Why a?', 'When a?']);
+
+    // The rewrite can't bring back a flagged question.
+    await prep.retryNow();
+    // 1 initial batch + up to maxAttemptsPerNote (2) tries at a rewrite.
+    expect(llm.batches, hasLength(3));
+    expect(stored(c).single.needsQuiz, isTrue,
+        reason: 'the fake AI only knows the three flagged questions');
   });
 
   test('editing a note drops its stale quiz', () async {

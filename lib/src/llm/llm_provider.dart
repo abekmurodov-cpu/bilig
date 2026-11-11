@@ -74,11 +74,13 @@ abstract class LlmProvider {
   /// recorded answer yet (it reasons from the prompt).
   Future<McQuiz> generateQuiz(KnowledgeItem item, {int distractorCount = 3});
 
-  /// Builds quizzes for several notes in **one** request, keyed by note id.
-  /// Notes the model skipped or garbled are simply absent from the result.
-  Future<Map<String, McQuiz>> generateQuizzes(
+  /// Builds quizzes for several notes in **one** request, keyed by note id:
+  /// up to [variantCount] differently-angled questions per note. Notes the
+  /// model skipped or garbled are simply absent from the result.
+  Future<Map<String, List<McQuiz>>> generateQuizzes(
     List<KnowledgeItem> items, {
     int distractorCount = 3,
+    int variantCount = 3,
   });
 
   /// Judges whether [answer] is a correct response to [item].

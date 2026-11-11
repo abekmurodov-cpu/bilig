@@ -30,9 +30,9 @@ abstract class PromptedLlm implements LlmProvider {
   @override
   Future<McQuiz> generateQuiz(KnowledgeItem item,
       {int distractorCount = 3}) async {
-    final quizzes =
-        await generateQuizzes([item], distractorCount: distractorCount);
-    final quiz = quizzes[item.id];
+    final quizzes = await generateQuizzes([item],
+        distractorCount: distractorCount, variantCount: 1);
+    final quiz = quizzes[item.id]?.first;
     if (quiz == null) {
       throw const LlmException(
           LlmErrorKind.badResponse, 'The AI returned an unusable quiz');
@@ -41,32 +41,51 @@ abstract class PromptedLlm implements LlmProvider {
   }
 
   @override
-  Future<Map<String, McQuiz>> generateQuizzes(
+  Future<Map<String, List<McQuiz>>> generateQuizzes(
     List<KnowledgeItem> items, {
     int distractorCount = 3,
+    int variantCount = 3,
   }) async {
     if (items.isEmpty) return const {};
-    final raw = await complete(quizBatchPrompt(items, distractorCount), json: true);
+    final raw = await complete(
+        quizBatchPrompt(items, distractorCount, variantCount: variantCount),
+        json: true);
     return parseQuizBatch(raw, items, distractorCount: distractorCount);
   }
 
   /// One prompt for many notes. Notes are numbered 1..n instead of sending
   /// their UUIDs, which saves tokens and is harder for the model to garble.
-  static String quizBatchPrompt(List<KnowledgeItem> items, int distractorCount) {
+  static String quizBatchPrompt(
+    List<KnowledgeItem> items,
+    int distractorCount, {
+    int variantCount = 3,
+  }) {
     final notes = StringBuffer();
     for (var i = 0; i < items.length; i++) {
       final item = items[i];
       notes.writeln('[${i + 1}] (${item.type.label.toLowerCase()}) '
           '${_clip(item.front)}');
       if (item.hasAnswer) notes.writeln('    Detail: ${_clip(item.back!)}');
+      if (item.badQuestions.isNotEmpty) {
+        notes.writeln('    The student flagged these earlier attempts as bad; '
+            'do not repeat them: ${item.badQuestions.map(_clip).join(' | ')}');
+      }
     }
+    final variantRule = variantCount <= 1
+        ? '- "variants": exactly 1 item.\n'
+        : '- "variants": $variantCount items that each test the note from a '
+            'DIFFERENT angle (e.g. the term from its definition, the '
+            'definition from the term, a key detail, a consequence or use), '
+            'so the student can\'t just memorize one wording. For a note that '
+            'is already a question, give 1 variant.\n';
     return 'You write quiz items for a spaced-repetition study app. '
-        'For EACH note below, write one multiple-choice item.\n'
+        'For EACH note below, write multiple-choice questions.\n'
         'Return JSON only, in this shape:\n'
-        '{"items": [{"id": 1, "question": "...", "answer": "...", '
-        '"distractors": ["...", "..."]}]}\n'
+        '{"items": [{"id": 1, "variants": [{"question": "...", "answer": "...", '
+        '"distractors": ["...", "..."]}]}]}\n'
         'Rules:\n'
         '- "id": the note number in square brackets.\n'
+        '$variantRule'
         '- "question": a clear question that TESTS the note. If the note is not '
         'already a question (a fact, a code snippet, a command, or a '
         'concept/term), REWRITE it as a question — never echo the note back, '
@@ -87,8 +106,9 @@ abstract class PromptedLlm implements LlmProvider {
   }
 
   /// Parses a batch reply into quizzes keyed by note id. Tolerates code fences,
-  /// a bare top-level list, and string ids. Malformed entries are dropped.
-  static Map<String, McQuiz> parseQuizBatch(
+  /// a bare top-level list, string ids, and items without a "variants" list
+  /// (one flat question). Malformed entries are dropped.
+  static Map<String, List<McQuiz>> parseQuizBatch(
     String raw,
     List<KnowledgeItem> items, {
     int distractorCount = 3,
@@ -99,7 +119,9 @@ abstract class PromptedLlm implements LlmProvider {
       entries = decoded;
     } else if (decoded is Map && decoded['items'] is List) {
       entries = decoded['items'] as List;
-    } else if (decoded is Map && decoded['question'] != null && items.length == 1) {
+    } else if (decoded is Map &&
+        (decoded['question'] != null || decoded['variants'] != null) &&
+        items.length == 1) {
       entries = [
         {...decoded, 'id': 1},
       ];
@@ -108,24 +130,31 @@ abstract class PromptedLlm implements LlmProvider {
           LlmErrorKind.badResponse, 'The AI returned an unusable quiz');
     }
 
-    final result = <String, McQuiz>{};
-    for (final entry in entries) {
-      if (entry is! Map) continue;
-      final number = int.tryParse('${entry['id']}'.trim());
-      if (number == null || number < 1 || number > items.length) continue;
-      final question = '${entry['question'] ?? ''}'.trim();
-      final answer = '${entry['answer'] ?? ''}'.trim();
-      final rawDistractors = entry['distractors'];
+    McQuiz? parseOne(Object? v) {
+      if (v is! Map) return null;
+      final question = '${v['question'] ?? ''}'.trim();
+      final answer = '${v['answer'] ?? ''}'.trim();
+      final rawDistractors = v['distractors'];
       if (question.isEmpty || answer.isEmpty || rawDistractors is! List) {
-        continue;
+        return null;
       }
       final distractors = rawDistractors
           .map((e) => '$e'.trim())
           .where((e) => e.isNotEmpty && e != answer)
           .take(distractorCount)
           .toList();
-      result[items[number - 1].id] =
-          McQuiz(question: question, answer: answer, distractors: distractors);
+      return McQuiz(question: question, answer: answer, distractors: distractors);
+    }
+
+    final result = <String, List<McQuiz>>{};
+    for (final entry in entries) {
+      if (entry is! Map) continue;
+      final number = int.tryParse('${entry['id']}'.trim());
+      if (number == null || number < 1 || number > items.length) continue;
+      final variants = entry['variants'] is List
+          ? [for (final v in entry['variants'] as List) ?parseOne(v)]
+          : [?parseOne(entry)];
+      if (variants.isNotEmpty) result[items[number - 1].id] = variants;
     }
     return result;
   }
@@ -137,7 +166,7 @@ abstract class PromptedLlm implements LlmProvider {
       'correct (meaning matches, ignore wording/typos/language). '
       'Return JSON: {"correct": true|false, "feedback": "one short sentence"}.\n\n'
       'Question: ${item.practicePrompt}\n'
-      'Expected answer: ${_clip(item.mcAnswer ?? item.back ?? '')}\n'
+      'Expected answer: ${_clip(item.activeQuiz?.answer ?? item.back ?? '')}\n'
       'Student answer: $answer',
       json: true,
     );

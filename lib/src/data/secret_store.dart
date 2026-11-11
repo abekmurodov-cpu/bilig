@@ -24,8 +24,9 @@ class SecretStore {
         _cache = {};
 
   static const String kAiApiKey = 'aiApiKey';
+  static const String kAiBackupApiKey = 'aiBackupApiKey';
   static const String kTelegramBotToken = 'telegramBotToken';
-  static const List<String> _keys = [kAiApiKey, kTelegramBotToken];
+  static const List<String> _keys = [kAiApiKey, kAiBackupApiKey, kTelegramBotToken];
 
   /// Settings-box prefix for values stored by the fallback.
   static const String _fallbackPrefix = 'secret.';

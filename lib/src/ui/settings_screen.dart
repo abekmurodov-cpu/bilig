@@ -193,7 +193,11 @@ String _serviceName(AiService s) => s.label.split(' (').first;
 /// Pick a service, paste a key (the service is recognized from the key where
 /// possible), then one "Test & connect" checks it and picks a model.
 class _AiConnectForm extends ConsumerStatefulWidget {
-  const _AiConnectForm();
+  const _AiConnectForm({this.backupFor, this.onCancel});
+
+  /// When set, the form connects a backup for this (main) AI instead.
+  final AiService? backupFor;
+  final VoidCallback? onCancel;
 
   @override
   ConsumerState<_AiConnectForm> createState() => _AiConnectFormState();
@@ -203,7 +207,10 @@ class _AiConnectFormState extends ConsumerState<_AiConnectForm> {
   final _keyController = TextEditingController();
   final _urlController = TextEditingController();
   final _modelController = TextEditingController();
-  AiService _service = AiService.gemini;
+  // A backup defaults to a free service other than the main one.
+  late AiService _service = widget.backupFor == AiService.gemini
+      ? AiService.groq
+      : AiService.gemini;
   bool _obscure = true;
   bool _busy = false;
   // Shown when no model could be picked automatically.
@@ -230,7 +237,9 @@ class _AiConnectFormState extends ConsumerState<_AiConnectForm> {
           _service = guess.candidates.first;
         }
         _keyHint = context.s.ambiguousKey(
-            _serviceName(guess.candidates[0]), _serviceName(guess.candidates[1]));
+          _serviceName(guess.candidates[0]),
+          _serviceName(guess.candidates[1]),
+        );
       } else {
         _keyHint = null;
       }
@@ -294,12 +303,23 @@ class _AiConnectFormState extends ConsumerState<_AiConnectForm> {
       return;
     }
 
-    await ref.read(aiConfigProvider.notifier).attach(config, models: models);
+    final backup = widget.backupFor != null;
+    if (backup) {
+      await ref.read(backupAiProvider.notifier).attach(config);
+    } else {
+      await ref.read(aiConfigProvider.notifier).attach(config, models: models);
+    }
     if (!mounted) return;
     FocusScope.of(context).unfocus();
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('${strings.connectedTo(_serviceName(_service))} · $model'),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          backup
+              ? strings.backupLabel(_serviceName(_service), model)
+              : '${strings.connectedTo(_serviceName(_service))} · $model',
+        ),
+      ),
+    );
   }
 
   @override
@@ -307,10 +327,11 @@ class _AiConnectFormState extends ConsumerState<_AiConnectForm> {
     final theme = Theme.of(context);
     final custom = _service == AiService.custom;
     final keyUrl = _service.keyUrl;
+    final backup = widget.backupFor != null;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(context.s.aiBlurb),
+        Text(backup ? context.s.backupBlurb : context.s.aiBlurb),
         const SizedBox(height: 12),
         InputDecorator(
           decoration: InputDecoration(
@@ -327,14 +348,18 @@ class _AiConnectFormState extends ConsumerState<_AiConnectForm> {
                   DropdownMenuItem(
                     value: s,
                     child: Text.rich(
-                      TextSpan(children: [
-                        TextSpan(text: s.label),
-                        if (s.freeTier)
-                          TextSpan(
-                            text: '  · ${context.s.freeTier}',
-                            style: TextStyle(color: theme.colorScheme.primary),
-                          ),
-                      ]),
+                      TextSpan(
+                        children: [
+                          TextSpan(text: s.label),
+                          if (s.freeTier)
+                            TextSpan(
+                              text: '  · ${context.s.freeTier}',
+                              style: TextStyle(
+                                color: theme.colorScheme.primary,
+                              ),
+                            ),
+                        ],
+                      ),
                       overflow: TextOverflow.ellipsis,
                     ),
                   ),
@@ -342,10 +367,10 @@ class _AiConnectFormState extends ConsumerState<_AiConnectForm> {
               onChanged: _busy
                   ? null
                   : (s) => setState(() {
-                        _service = s!;
-                        _keyHint = null;
-                        _error = null;
-                      }),
+                      _service = s!;
+                      _keyHint = null;
+                      _error = null;
+                    }),
             ),
           ),
         ),
@@ -392,32 +417,107 @@ class _AiConnectFormState extends ConsumerState<_AiConnectForm> {
         ],
         if (keyUrl != null)
           TextButton.icon(
-            onPressed: () => launchUrl(Uri.parse(keyUrl),
-                mode: LaunchMode.externalApplication),
+            onPressed: () => launchUrl(
+              Uri.parse(keyUrl),
+              mode: LaunchMode.externalApplication,
+            ),
             icon: const Icon(Icons.open_in_new, size: 18),
             label: Text(context.s.getKey(_serviceName(_service))),
           )
         else
           const SizedBox(height: 12),
-        Text(context.s.subscriptionNote, style: theme.textTheme.bodySmall),
+        if (!backup)
+          Text(context.s.subscriptionNote, style: theme.textTheme.bodySmall),
         if (_error != null) ...[
           const SizedBox(height: 12),
           Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
         ],
         const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerRight,
-          child: FilledButton.icon(
-            onPressed: _busy ? null : _connect,
-            icon: _busy
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.link),
-            label: Text(_busy ? context.s.testing : context.s.testAndConnect),
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            if (widget.onCancel != null)
+              TextButton(
+                onPressed: _busy ? null : widget.onCancel,
+                child: Text(context.s.cancel),
+              ),
+            const SizedBox(width: 8),
+            FilledButton.icon(
+              onPressed: _busy ? null : _connect,
+              icon: _busy
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.link),
+              label: Text(_busy ? context.s.testing : context.s.testAndConnect),
+            ),
+          ],
         ),
+      ],
+    );
+  }
+}
+
+/// The optional backup AI under the connected one: add it with the same
+/// connect form, or see and remove it.
+class _BackupAi extends ConsumerStatefulWidget {
+  const _BackupAi({required this.mainService});
+
+  final AiService mainService;
+
+  @override
+  ConsumerState<_BackupAi> createState() => _BackupAiState();
+}
+
+class _BackupAiState extends ConsumerState<_BackupAi> {
+  bool _adding = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final backup = ref.watch(backupAiProvider);
+    final theme = Theme.of(context);
+    if (backup != null) {
+      return Row(
+        children: [
+          Icon(Icons.swap_horiz, color: theme.colorScheme.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              context.s.backupLabel(_serviceName(backup.service), backup.model),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          TextButton(
+            onPressed: () => ref.read(backupAiProvider.notifier).detach(),
+            child: Text(context.s.remove),
+          ),
+        ],
+      );
+    }
+    if (_adding) {
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          border: Border.all(color: theme.colorScheme.outlineVariant),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: _AiConnectForm(
+          backupFor: widget.mainService,
+          onCancel: () => setState(() => _adding = false),
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        TextButton.icon(
+          onPressed: () => setState(() => _adding = true),
+          icon: const Icon(Icons.add),
+          label: Text(context.s.addBackup),
+        ),
+        Text(context.s.backupBlurb, style: theme.textTheme.bodySmall),
       ],
     );
   }
@@ -521,8 +621,7 @@ class _AiConnectedState extends ConsumerState<_AiConnected> {
     final models = {
       ...ref.read(aiConfigProvider.notifier).models,
       config.model,
-    }.toList()
-      ..sort();
+    }.toList()..sort();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -531,7 +630,8 @@ class _AiConnectedState extends ConsumerState<_AiConnected> {
             const Icon(Icons.check_circle, color: Color(0xFF2E9E4F)),
             const SizedBox(width: 12),
             Expanded(
-                child: Text(context.s.connectedTo(_serviceName(config.service)))),
+              child: Text(context.s.connectedTo(_serviceName(config.service))),
+            ),
             TextButton.icon(
               onPressed: () => ref.read(aiConfigProvider.notifier).detach(),
               icon: const Icon(Icons.link_off),
@@ -561,8 +661,10 @@ class _AiConnectedState extends ConsumerState<_AiConnected> {
                         ),
                       DropdownMenuItem(
                         value: _otherModel,
-                        child: Text(context.s.otherModel,
-                            style: TextStyle(color: theme.colorScheme.primary)),
+                        child: Text(
+                          context.s.otherModel,
+                          style: TextStyle(color: theme.colorScheme.primary),
+                        ),
                       ),
                     ],
                     onChanged: (m) {
@@ -583,7 +685,8 @@ class _AiConnectedState extends ConsumerState<_AiConnected> {
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2))
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                   : const Icon(Icons.refresh),
             ),
           ],
@@ -597,9 +700,12 @@ class _AiConnectedState extends ConsumerState<_AiConnected> {
                   ? const SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2))
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
                   : const Icon(Icons.network_check, size: 18),
-              label: Text(_testing ? context.s.testing : context.s.testConnection),
+              label: Text(
+                _testing ? context.s.testing : context.s.testConnection,
+              ),
             ),
           ],
         ),
@@ -614,7 +720,9 @@ class _AiConnectedState extends ConsumerState<_AiConnected> {
             ),
           ),
         ],
-        const SizedBox(height: 12),
+        const Divider(height: 28),
+        _BackupAi(mainService: config.service),
+        const Divider(height: 28),
         const _QuizPrepStatus(),
       ],
     );
@@ -644,7 +752,7 @@ class _QuizPrepStatus extends ConsumerWidget {
       detail = until == null
           ? context.s.aiPauseReason(prep.pause!)
           : '${context.s.aiPauseReason(prep.pause!)} '
-              '${context.s.resumesAt(TimeOfDay.fromDateTime(until).format(context))}';
+                '${context.s.resumesAt(TimeOfDay.fromDateTime(until).format(context))}';
     } else {
       detail = null;
     }
@@ -705,8 +813,9 @@ class _TelegramSectionState extends ConsumerState<_TelegramSection> {
 
   void _report(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(message)));
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
   }
 
   void _clearBusy() {
@@ -734,15 +843,18 @@ class _TelegramSectionState extends ConsumerState<_TelegramSection> {
       final service = TelegramSyncService(botToken: token, chatId: chatId);
       final username = await service.getMe();
       await service.checkChat();
-      await ref.read(telegramConfigProvider.notifier).attach(
+      await ref
+          .read(telegramConfigProvider.notifier)
+          .attach(
             TelegramConfig(botToken: token, chatId: chatId, user: username),
           );
       _tokenController.clear();
       _chatController.clear();
       _report(strings.attachedBot(username));
     } catch (e) {
-      _report(strings.couldNotAttach(
-          e.toString().replaceFirst('Exception: ', '')));
+      _report(
+        strings.couldNotAttach(e.toString().replaceFirst('Exception: ', '')),
+      );
     } finally {
       _clearBusy();
     }
@@ -801,8 +913,10 @@ class _TelegramSectionState extends ConsumerState<_TelegramSection> {
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child:
-                                    CircularProgressIndicator(strokeWidth: 2))
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
                             : const Icon(Icons.sync),
                         label: Text(_status ?? context.s.syncNow),
                       ),
@@ -811,8 +925,8 @@ class _TelegramSectionState extends ConsumerState<_TelegramSection> {
                         onPressed: _busy
                             ? null
                             : () => ref
-                                .read(telegramConfigProvider.notifier)
-                                .detach(),
+                                  .read(telegramConfigProvider.notifier)
+                                  .detach(),
                         icon: const Icon(Icons.link_off),
                         label: Text(context.s.detach),
                       ),
@@ -850,7 +964,8 @@ class _TelegramSectionState extends ConsumerState<_TelegramSection> {
                           ? const SizedBox(
                               width: 16,
                               height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2))
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
                           : const Icon(Icons.link),
                       label: Text(_status ?? context.s.attach),
                     ),

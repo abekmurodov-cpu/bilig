@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/knowledge_item.dart';
+import '../practice/answer_matching.dart';
 import '../practice/quiz_quality.dart';
 import '../providers/knowledge_providers.dart';
 import 'llm_provider.dart';
@@ -183,19 +184,20 @@ class QuizPrep extends Notifier<QuizPrepState> {
   /// Applies good quizzes onto the **current** copy of each note, so a grade
   /// recorded while the request was in flight isn't overwritten. Notes edited
   /// meanwhile are skipped; they'll be picked up again.
-  Future<void> _save(List<KnowledgeItem> batch, Map<String, McQuiz> quizzes) async {
+  Future<void> _save(
+      List<KnowledgeItem> batch, Map<String, List<McQuiz>> quizzes) async {
     final current = {
       for (final i in ref.read(knowledgeListProvider).asData?.value ?? const <KnowledgeItem>[])
         i.id: i,
     };
     final updates = <KnowledgeItem>[];
     for (final sent in batch) {
-      final quiz = quizzes[sent.id];
       final now = current[sent.id];
-      if (quiz == null || now == null) continue;
+      if (now == null) continue;
       if (now.front != sent.front || now.back != sent.back) continue;
-      if (quizProblem(quiz) != null) continue;
-      updates.add(applyQuiz(now, quiz));
+      final good = usableQuizzes(now, quizzes[sent.id] ?? const []);
+      if (good.isEmpty) continue;
+      updates.add(applyQuizzes(now, good));
     }
     if (updates.isNotEmpty) {
       await ref.read(knowledgeListProvider.notifier).persistAll(updates);
@@ -225,19 +227,44 @@ class QuizPrep extends Notifier<QuizPrepState> {
   }
 }
 
-/// Writes [quiz] onto [item]. Content notes (anything but a question) get the
-/// reworded question as their practice prompt; answer-less notes get the
-/// concise answer as their answer.
-KnowledgeItem applyQuiz(KnowledgeItem item, McQuiz quiz) {
-  var updated = item.copyWith(
-    mcAnswer: quiz.answer,
-    mcDistractors: quiz.distractors,
-    back: item.hasAnswer ? item.back : quiz.answer,
-  );
-  if (item.type != KnowledgeType.question) {
-    updated = updated.copyWith(quizQuestion: quiz.question);
+/// The generated questions worth keeping for [item]: passing the quality
+/// check, not repeating a question the student flagged, and not repeating
+/// each other. A note that is already a question keeps just one (its own
+/// wording is always used, so more would only differ in options).
+List<McQuiz> usableQuizzes(KnowledgeItem item, List<McQuiz> quizzes) {
+  final seen = {for (final b in item.badQuestions) normalizeAnswer(b)};
+  final good = <McQuiz>[];
+  for (final quiz in quizzes) {
+    if (quizProblem(quiz) != null) continue;
+    final key = normalizeAnswer(
+        item.type == KnowledgeType.question ? quiz.answer : quiz.question);
+    if (!seen.add(key)) continue;
+    good.add(quiz);
   }
-  return updated;
+  final limit = item.type == KnowledgeType.question ? 1 : 3;
+  return good.take(limit).toList();
+}
+
+/// Writes [quizzes] (at least one) onto [item]: the first fills the stored
+/// quiz fields, the rest become [KnowledgeItem.extraQuizzes]. Content notes
+/// (anything but a question) get reworded questions as their practice
+/// prompts; answer-less notes get the first concise answer as their answer.
+KnowledgeItem applyQuizzes(KnowledgeItem item, List<McQuiz> quizzes) {
+  final isQuestion = item.type == KnowledgeType.question;
+  QuizVariant variant(McQuiz q) => QuizVariant(
+        question: isQuestion ? null : q.question,
+        answer: q.answer,
+        distractors: q.distractors,
+      );
+  final first = quizzes.first;
+  return KnowledgeItem.fromMap({
+    ...item.toMap(),
+    'quizQuestion': isQuestion ? null : first.question,
+    'mcAnswer': first.answer,
+    'mcDistractors': first.distractors,
+    'back': item.hasAnswer ? item.back : first.answer,
+    'extraQuizzes': [for (final q in quizzes.skip(1)) variant(q).toMap()],
+  });
 }
 
 final quizPrepProvider =

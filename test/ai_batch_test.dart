@@ -63,7 +63,27 @@ void main() {
           ']}\n```';
       final quizzes = PromptedLlm.parseQuizBatch(raw, notes);
       expect(quizzes.keys, ['uuid-b']);
-      expect(quizzes['uuid-b']!.distractors, hasLength(3));
+      expect(quizzes['uuid-b']!.single.distractors, hasLength(3));
+    });
+
+    test('reads several variants per note', () {
+      const raw = '{"items": [{"id": 1, "variants": ['
+          '{"question": "At what temperature does water boil?", "answer": "100°C", '
+          '"distractors": ["90°C", "80°C", "120°C"]},'
+          '{"question": "What happens to water at 100°C?", "answer": "It boils", '
+          '"distractors": ["It freezes", "It melts", "It condenses"]},'
+          '{"question": "broken"}'
+          ']}]}';
+      final quizzes = PromptedLlm.parseQuizBatch(raw, notes);
+      expect(quizzes['uuid-a']!.map((q) => q.answer), ['100°C', 'It boils']);
+    });
+
+    test('flagged questions are passed to the AI to avoid', () {
+      final flagged = note('uuid-c', 'Paris is the capital of France')
+          .copyWith(badQuestions: ['Is Paris in France?']);
+      final prompt = PromptedLlm.quizBatchPrompt([flagged], 3);
+      expect(prompt, contains('do not repeat them: Is Paris in France?'));
+      expect(prompt, contains('"variants": 3 items'));
     });
 
     test('accepts a bare list', () {

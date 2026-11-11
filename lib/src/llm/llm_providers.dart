@@ -9,6 +9,7 @@ import '../data/settings_repository.dart';
 import '../providers/settings_providers.dart';
 import 'ai_services.dart';
 import 'anthropic_provider.dart';
+import 'fallback_llm.dart';
 import 'gemini_provider.dart';
 import 'http_llm.dart';
 import 'llm_provider.dart';
@@ -123,7 +124,9 @@ class AiConfigNotifier extends Notifier<AiConfig?> {
     state = current.withModel(model);
   }
 
+  /// Disconnects the AI (and its backup, which only backs up a main AI).
   Future<void> detach() async {
+    await ref.read(backupAiProvider.notifier).detach();
     await _secrets.write(SecretStore.kAiApiKey, null);
     for (final key in [
       SettingsRepository.kAiService,
@@ -155,9 +158,59 @@ class AiConfigNotifier extends Notifier<AiConfig?> {
 final aiConfigProvider =
     NotifierProvider<AiConfigNotifier, AiConfig?>(AiConfigNotifier.new);
 
-/// The active LLM, or null when no AI is connected. UI features that use the
-/// LLM watch this and hide/fall back when it is null.
+/// An optional second AI, used automatically when the main one is limited or
+/// failing (see [FallbackLlm]). Stored like the main one, under its own keys.
+class BackupAiNotifier extends Notifier<AiConfig?> {
+  SettingsRepository get _settings => ref.read(settingsRepositoryProvider);
+  SecretStore get _secrets => ref.read(secretStoreProvider);
+
+  @override
+  AiConfig? build() {
+    final serviceName = _settings.getString(SettingsRepository.kAiBackupService);
+    final model = _settings.getString(SettingsRepository.kAiBackupModel);
+    if (serviceName == null || model == null) return null;
+    final service = AiService.fromName(serviceName);
+    final key = _secrets.read(SecretStore.kAiBackupApiKey) ?? '';
+    if (service.needsKey && key.isEmpty) return null;
+    return AiConfig(
+      service: service,
+      model: model,
+      apiKey: key,
+      baseUrl: _settings.getString(SettingsRepository.kAiBackupBaseUrl),
+    );
+  }
+
+  Future<void> attach(AiConfig config) async {
+    await _secrets.write(SecretStore.kAiBackupApiKey, config.apiKey);
+    await _settings.setString(SettingsRepository.kAiBackupService, config.service.name);
+    await _settings.setString(SettingsRepository.kAiBackupModel, config.model);
+    await _settings.setString(SettingsRepository.kAiBackupBaseUrl, config.baseUrl);
+    state = config;
+  }
+
+  Future<void> detach() async {
+    await _secrets.write(SecretStore.kAiBackupApiKey, null);
+    for (final key in [
+      SettingsRepository.kAiBackupService,
+      SettingsRepository.kAiBackupModel,
+      SettingsRepository.kAiBackupBaseUrl,
+    ]) {
+      await _settings.setString(key, null);
+    }
+    state = null;
+  }
+}
+
+final backupAiProvider =
+    NotifierProvider<BackupAiNotifier, AiConfig?>(BackupAiNotifier.new);
+
+/// The active LLM, or null when no AI is connected. With a backup connected
+/// it falls back to it automatically. UI features that use the LLM watch this
+/// and hide/fall back when it is null.
 final llmProvider = Provider<LlmProvider?>((ref) {
   final config = ref.watch(aiConfigProvider);
-  return config == null ? null : createLlm(config);
+  if (config == null) return null;
+  final backup = ref.watch(backupAiProvider);
+  final primary = createLlm(config);
+  return backup == null ? primary : FallbackLlm(primary, createLlm(backup));
 });
