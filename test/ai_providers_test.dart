@@ -16,6 +16,7 @@ import 'package:knowledge/src/llm/llm_providers.dart';
 import 'package:knowledge/src/llm/openai_compatible_provider.dart';
 import 'package:knowledge/src/models/knowledge_item.dart';
 import 'package:knowledge/src/providers/settings_providers.dart';
+import 'package:knowledge/src/sync/sync_providers.dart';
 
 Matcher llmError(LlmErrorKind kind) =>
     throwsA(isA<LlmException>().having((e) => e.kind, 'kind', kind));
@@ -61,7 +62,7 @@ void main() {
 
     test('services with a default use it when available', () {
       expect(recommendedModel(AiService.claude, ['claude-haiku-5-5', 'claude-opus-5-5']),
-          'claude-opus-5-5');
+          'claude-haiku-5-5');
       expect(recommendedModel(AiService.deepseek, const []), 'deepseek-chat');
     });
 
@@ -307,6 +308,8 @@ void main() {
         SettingsRepository.kAiModel,
         SettingsRepository.kAiBaseUrl,
         SettingsRepository.kAiModels,
+        SettingsRepository.kTelegramBotToken,
+        SettingsRepository.kTelegramChatId,
       ]) {
         await settings.setString(k, null);
       }
@@ -342,6 +345,25 @@ void main() {
       final again = containerWith(secrets);
       addTearDown(again.dispose);
       expect(again.read(aiConfigProvider)!.model, 'gemini-2.5-flash');
+    });
+
+    test('moves a plain-text Telegram token into the secret store', () async {
+      await settings.setString(SettingsRepository.kTelegramBotToken, '123:abc');
+      await settings.setString(SettingsRepository.kTelegramChatId, '-10042');
+      final secrets = SecretStore.memory();
+      final c = containerWith(secrets);
+      addTearDown(c.dispose);
+
+      expect(c.read(telegramConfigProvider)!.botToken, '123:abc');
+      for (var i = 0;
+          i < 100 && settings.getString(SettingsRepository.kTelegramBotToken) != null;
+          i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      expect(settings.getString(SettingsRepository.kTelegramBotToken), isNull);
+      expect(secrets.read(SecretStore.kTelegramBotToken), '123:abc');
+      await c.read(telegramConfigProvider.notifier).detach();
+      expect(secrets.read(SecretStore.kTelegramBotToken), isNull);
     });
 
     test('attach, change model, detach', () async {

@@ -20,6 +20,7 @@ class SettingsRepository {
   static const String kAiModel = 'aiModel';
   static const String kAiBaseUrl = 'aiBaseUrl';
   static const String kAiModels = 'aiModels';
+  /// Legacy location of the bot token; now in SecretStore (migrated on load).
   static const String kTelegramBotToken = 'telegramBotToken';
   static const String kTelegramChatId = 'telegramChatId';
   static const String kTelegramUser = 'telegramUser';

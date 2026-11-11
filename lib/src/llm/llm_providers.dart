@@ -14,9 +14,6 @@ import 'http_llm.dart';
 import 'llm_provider.dart';
 import 'openai_compatible_provider.dart';
 
-/// Bound to the real secure store in `main`; in-memory otherwise (tests).
-final secretStoreProvider = Provider<SecretStore>((ref) => SecretStore.memory());
-
 /// One connected AI: which service, which model, and how to reach it.
 class AiConfig {
   const AiConfig({

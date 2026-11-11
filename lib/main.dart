@@ -7,7 +7,6 @@ import 'src/data/knowledge_repository.dart';
 import 'src/data/secret_store.dart';
 import 'src/data/settings_repository.dart';
 import 'src/l10n/app_strings.dart';
-import 'src/llm/llm_providers.dart';
 import 'src/notifications/notification_providers.dart';
 import 'src/notifications/notification_service.dart';
 import 'src/providers/knowledge_providers.dart';

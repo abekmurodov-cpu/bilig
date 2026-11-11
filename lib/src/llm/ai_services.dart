@@ -23,8 +23,10 @@ enum AiService {
     label: 'Claude (Anthropic)',
     api: AiApi.anthropic,
     keyUrl: 'https://console.anthropic.com/settings/keys',
-    defaultModel: 'claude-opus-5-5',
-    prefer: [r'^claude-opus-\d', r'^claude-'],
+    // Short note/quiz tasks don't need a bigger model; Haiku keeps a
+    // student's key cheap.
+    defaultModel: 'claude-haiku-5-5',
+    prefer: [r'^claude-haiku-\d', r'^claude-'],
   ),
   deepseek(
     label: 'DeepSeek',

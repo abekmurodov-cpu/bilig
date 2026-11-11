@@ -5,8 +5,9 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'settings_repository.dart';
 
-/// Holds secrets (AI API keys) in the platform's secure storage: Keychain on
-/// Apple platforms, encrypted storage on Android, WebCrypto on the web.
+/// Holds secrets (AI API key, Telegram bot token) in the platform's secure
+/// storage: Keychain on Apple platforms, encrypted storage on Android,
+/// WebCrypto on the web.
 ///
 /// Values are loaded once at startup and served synchronously from memory.
 /// If secure storage is unavailable (it can be on unsigned desktop builds or
@@ -23,7 +24,8 @@ class SecretStore {
         _cache = {};
 
   static const String kAiApiKey = 'aiApiKey';
-  static const List<String> _keys = [kAiApiKey];
+  static const String kTelegramBotToken = 'telegramBotToken';
+  static const List<String> _keys = [kAiApiKey, kTelegramBotToken];
 
   /// Settings-box prefix for values stored by the fallback.
   static const String _fallbackPrefix = 'secret.';

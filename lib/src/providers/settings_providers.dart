@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/secret_store.dart';
 import '../data/settings_repository.dart';
 import '../l10n/app_strings.dart';
 
 /// Bound to the concrete repository in `main` via a ProviderScope override,
 /// mirroring [knowledgeRepositoryProvider].
+/// Bound to the real secure store in `main`; in-memory otherwise (tests).
+final secretStoreProvider = Provider<SecretStore>((ref) => SecretStore.memory());
+
 final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
   throw UnimplementedError('settingsRepositoryProvider must be overridden');
 });
