@@ -4,8 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'src/data/image_store.dart';
 import 'src/data/knowledge_repository.dart';
+import 'src/data/secret_store.dart';
 import 'src/data/settings_repository.dart';
 import 'src/l10n/app_strings.dart';
+import 'src/llm/llm_providers.dart';
 import 'src/notifications/notification_providers.dart';
 import 'src/notifications/notification_service.dart';
 import 'src/providers/knowledge_providers.dart';
@@ -19,6 +21,7 @@ Future<void> main() async {
   final repository = await HiveKnowledgeRepository.open();
   final images = await ImageStore.open();
   final settings = await SettingsRepository.open();
+  final secrets = await SecretStore.open(settings);
   final notifications = NotificationService();
   await notifications.init();
 
@@ -28,6 +31,7 @@ Future<void> main() async {
         knowledgeRepositoryProvider.overrideWithValue(repository),
         imageStoreProvider.overrideWithValue(images),
         settingsRepositoryProvider.overrideWithValue(settings),
+        secretStoreProvider.overrideWithValue(secrets),
         notificationServiceProvider.overrideWithValue(notifications),
       ],
       child: const BiligApp(),

@@ -1,7 +1,8 @@
 import 'package:hive_ce_flutter/hive_ce_flutter.dart';
 
 /// Small key/value store for app preferences and attached-service credentials
-/// (theme, Gemini key, Telegram bot config, practice defaults). Backed by its
+/// (theme, AI service + model, Telegram bot config, practice defaults; AI keys
+/// themselves live in SecretStore). Backed by its
 /// own Hive box so it stays independent of the knowledge-items store and works
 /// the same on mobile and web.
 class SettingsRepository {
@@ -12,8 +13,13 @@ class SettingsRepository {
   // Keys.
   static const String kThemeMode = 'themeMode';
   static const String kLanguage = 'language';
+  /// Legacy (Gemini-only) AI settings; migrated to the kAi* keys on load.
   static const String kGeminiApiKey = 'geminiApiKey';
   static const String kGeminiModel = 'geminiModel';
+  static const String kAiService = 'aiService';
+  static const String kAiModel = 'aiModel';
+  static const String kAiBaseUrl = 'aiBaseUrl';
+  static const String kAiModels = 'aiModels';
   static const String kTelegramBotToken = 'telegramBotToken';
   static const String kTelegramChatId = 'telegramChatId';
   static const String kTelegramUser = 'telegramUser';

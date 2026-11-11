@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
+import '../llm/llm_provider.dart';
 import '../llm/quiz_prep.dart';
 import '../models/knowledge_item.dart';
 import '../practice/practice_models.dart';
@@ -167,18 +168,84 @@ class AppStrings {
         'Пора повторить — заметки ждут, чтобы проверить вас.',
       );
   String get aiProvider => _t('AI provider', 'AI provayder', 'ИИ-провайдер');
-  String get geminiAttached =>
-      _t('Gemini attached', 'Gemini ulangan', 'Gemini подключён');
   String get model => _t('Model', 'Model', 'Модель');
-  String get geminiBlurb => _t(
-        'Attach Gemini to auto-expand notes, generate quizzes, '
-            'grade typed answers, and suggest categories.',
-        'Gemini ulansa, qaydlarni to‘ldiradi, testlar tuzadi, yozilgan '
-            'javoblarni baholaydi va turkumlarni taklif qiladi.',
-        'Подключите Gemini, чтобы дополнять заметки, создавать тесты, '
-            'проверять ответы и предлагать категории.',
+  String get aiBlurb => _t(
+        'Connect an AI to fill in notes, write practice questions, check typed '
+            'answers and suggest categories. Use your own API key from any '
+            'service below.',
+        'Qaydlarni to‘ldirish, mashq savollarini tuzish, yozilgan javoblarni '
+            'tekshirish va turkum taklif qilish uchun AI ulang. Quyidagi '
+            'xizmatlardan istalganining o‘z API kalitingizdan foydalaning.',
+        'Подключите ИИ, чтобы дополнять заметки, составлять вопросы, проверять '
+            'ответы и предлагать категории. Используйте свой API-ключ любого '
+            'сервиса ниже.',
       );
-  String get geminiKey => _t('Gemini API key', 'Gemini API kaliti', 'API-ключ Gemini');
+  String get service => _t('Service', 'Xizmat', 'Сервис');
+  String get freeTier => _t('free tier', 'bepul tarif', 'бесплатный тариф');
+  String get apiKey => _t('API key', 'API kalit', 'API-ключ');
+  String get apiKeyOptional =>
+      _t('API key (optional)', 'API kalit (ixtiyoriy)', 'API-ключ (необязательно)');
+  String get serverAddress => _t('Server address', 'Server manzili', 'Адрес сервера');
+  String get modelName => _t('Model name', 'Model nomi', 'Название модели');
+  String detectedService(String name) => _t('Looks like a $name key',
+      '$name kalitiga o‘xshaydi', 'Похоже на ключ $name');
+  String ambiguousKey(String a, String b) => _t(
+        'Could be $a or $b. Pick the service above.',
+        '$a yoki $b bo‘lishi mumkin. Yuqoridan xizmatni tanlang.',
+        'Это может быть $a или $b. Выберите сервис выше.',
+      );
+  String getKey(String name) =>
+      _t('Get a $name key', '$name kalitini olish', 'Получить ключ $name');
+  String get subscriptionNote => _t(
+        'A ChatGPT Plus or Claude Pro subscription does not include an API key: '
+            'API access is set up and paid for separately. Gemini, Groq and '
+            'OpenRouter (free models) work without paying, within limits.',
+        'ChatGPT Plus yoki Claude Pro obunasi API kalitini o‘z ichiga olmaydi: '
+            'API alohida sozlanadi va alohida to‘lanadi. Gemini, Groq va '
+            'OpenRouter (bepul modellar) cheklovlar doirasida tekin ishlaydi.',
+        'Подписка ChatGPT Plus или Claude Pro не даёт API-ключ: доступ к API '
+            'настраивается и оплачивается отдельно. Gemini, Groq и OpenRouter '
+            '(бесплатные модели) работают без оплаты, в пределах лимитов.',
+      );
+  String get testAndConnect =>
+      _t('Test & connect', 'Tekshirish va ulash', 'Проверить и подключить');
+  String get testConnection =>
+      _t('Test connection', 'Ulanishni tekshirish', 'Проверить подключение');
+  String get testing => _t('Testing…', 'Tekshirilmoqda…', 'Проверяем…');
+  String connectedTo(String name) =>
+      _t('$name connected', '$name ulangan', '$name подключён');
+  String get testOk =>
+      _t('Works: the AI answered.', 'Ishlayapti: AI javob berdi.', 'Работает: ИИ ответил.');
+  String aiFailure(LlmErrorKind kind, String message) => switch (kind) {
+        LlmErrorKind.auth => _t(
+            'The key was rejected. Check that you copied all of it and picked '
+                'the right service.',
+            'Kalit qabul qilinmadi. Uni to‘liq nusxalaganingizni va to‘g‘ri '
+                'xizmatni tanlaganingizni tekshiring.',
+            'Ключ отклонён. Проверьте, что он скопирован полностью и выбран '
+                'правильный сервис.'),
+        LlmErrorKind.quotaExhausted => _t(
+            'The key works, but it has no credit or its limit is used up.',
+            'Kalit ishlaydi, lekin unda mablag‘ yo‘q yoki limit tugagan.',
+            'Ключ работает, но на нём нет средств или исчерпан лимит.'),
+        LlmErrorKind.rateLimited => _t(
+            'Too many requests right now. Try again in a minute.',
+            'Hozir so‘rovlar juda ko‘p. Bir daqiqadan so‘ng qayta urining.',
+            'Сейчас слишком много запросов. Попробуйте через минуту.'),
+        LlmErrorKind.network => _t(
+            'Couldn’t reach the service. Check your internet (or the server address).',
+            'Xizmatga ulanib bo‘lmadi. Internetni (yoki server manzilini) tekshiring.',
+            'Не удалось связаться с сервисом. Проверьте интернет (или адрес сервера).'),
+        LlmErrorKind.badResponse || LlmErrorKind.other => message,
+      };
+  String get noModelFound => _t(
+        'No usable model found. Type a model name.',
+        'Mos model topilmadi. Model nomini yozing.',
+        'Подходящая модель не найдена. Введите название модели.',
+      );
+  String get otherModel => _t('Other model…', 'Boshqa model…', 'Другая модель…');
+  String get refreshModels => _t('Refresh model list',
+      'Modellar ro‘yxatini yangilash', 'Обновить список моделей');
   String get syncTelegram =>
       _t('Sync (Telegram)', 'Sinxronlash (Telegram)', 'Синхронизация (Telegram)');
   String get telegramBlurb => _t(
@@ -321,12 +388,12 @@ class AppStrings {
       );
   String get offlineCheck => _t(
         'Offline check needs an equivalent match (ignoring whitespace and '
-            'comments). Attach Gemini to accept any working code.',
+            'comments). Connect an AI to accept any working code.',
         'Oflayn tekshiruv mos kodni talab qiladi (bo‘shliq va izohlar '
             'hisobga olinmaydi). Har qanday ishlaydigan kod qabul qilinishi '
-            'uchun Gemini ulang.',
+            'uchun AI ulang.',
         'Офлайн-проверка требует совпадения (без учёта пробелов и '
-            'комментариев). Подключите Gemini, чтобы принимался любой рабочий код.',
+            'комментариев). Подключите ИИ, чтобы принимался любой рабочий код.',
       );
   String get fillBlanksTitle =>
       _t('Fill in the blanks', 'Bo‘sh joylarni to‘ldiring', 'Заполните пропуски');

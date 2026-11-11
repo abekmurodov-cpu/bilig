@@ -1,8 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_strings.dart';
+import '../llm/ai_services.dart';
+import '../llm/llm_provider.dart';
 import '../llm/llm_providers.dart';
 import '../llm/quiz_prep.dart';
 import '../notifications/notification_providers.dart';
@@ -167,115 +170,453 @@ class _RemindersSection extends ConsumerWidget {
   }
 }
 
-class _LlmSection extends ConsumerStatefulWidget {
+class _LlmSection extends ConsumerWidget {
   const _LlmSection();
 
   @override
-  ConsumerState<_LlmSection> createState() => _LlmSectionState();
-}
-
-class _LlmSectionState extends ConsumerState<_LlmSection> {
-  final _keyController = TextEditingController();
-  bool _obscure = true;
-
-  @override
-  void dispose() {
-    _keyController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _attach() async {
-    final key = _keyController.text.trim();
-    if (key.isEmpty) return;
-    await ref.read(geminiKeyProvider.notifier).attach(key);
-    _keyController.clear();
-    if (mounted) FocusScope.of(context).unfocus();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final key = ref.watch(geminiKeyProvider);
-    final attached = key != null && key.isNotEmpty;
-
+  Widget build(BuildContext context, WidgetRef ref) {
+    final config = ref.watch(aiConfigProvider);
     return SettingsSection(
       title: context.s.aiProvider,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: attached
-            ? Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.check_circle, color: Color(0xFF2E9E4F)),
-                      const SizedBox(width: 12),
-                      Expanded(child: Text(context.s.geminiAttached)),
-                      TextButton.icon(
-                        onPressed: () =>
-                            ref.read(geminiKeyProvider.notifier).detach(),
-                        icon: const Icon(Icons.link_off),
-                        label: Text(context.s.detach),
+        child: config == null
+            ? const _AiConnectForm()
+            : _AiConnected(config: config),
+      ),
+    );
+  }
+}
+
+String _serviceName(AiService s) => s.label.split(' (').first;
+
+/// Pick a service, paste a key (the service is recognized from the key where
+/// possible), then one "Test & connect" checks it and picks a model.
+class _AiConnectForm extends ConsumerStatefulWidget {
+  const _AiConnectForm();
+
+  @override
+  ConsumerState<_AiConnectForm> createState() => _AiConnectFormState();
+}
+
+class _AiConnectFormState extends ConsumerState<_AiConnectForm> {
+  final _keyController = TextEditingController();
+  final _urlController = TextEditingController();
+  final _modelController = TextEditingController();
+  AiService _service = AiService.gemini;
+  bool _obscure = true;
+  bool _busy = false;
+  // Shown when no model could be picked automatically.
+  bool _askModel = false;
+  String? _keyHint;
+  String? _error;
+
+  @override
+  void dispose() {
+    _keyController.dispose();
+    _urlController.dispose();
+    _modelController.dispose();
+    super.dispose();
+  }
+
+  void _onKeyChanged(String value) {
+    final guess = guessService(value);
+    setState(() {
+      if (guess.service != null) {
+        _service = guess.service!;
+        _keyHint = context.s.detectedService(_serviceName(_service));
+      } else if (guess.candidates.length > 1) {
+        if (!guess.candidates.contains(_service)) {
+          _service = guess.candidates.first;
+        }
+        _keyHint = context.s.ambiguousKey(
+            _serviceName(guess.candidates[0]), _serviceName(guess.candidates[1]));
+      } else {
+        _keyHint = null;
+      }
+    });
+  }
+
+  Future<void> _connect() async {
+    final strings = context.s;
+    final key = _keyController.text.trim();
+    final url = _urlController.text.trim();
+    if (_service.needsKey && key.isEmpty) return;
+    if (_service == AiService.custom && url.isEmpty) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+
+    final typedModel = _modelController.text.trim();
+    final base = AiConfig(
+      service: _service,
+      model: typedModel,
+      apiKey: key,
+      baseUrl: _service == AiService.custom ? url : null,
+    );
+    // The model list is a convenience: if it fails, the test below reports
+    // the real problem.
+    var models = const <String>[];
+    try {
+      models = await createLlm(base).listModels();
+    } catch (_) {}
+
+    final model = typedModel.isNotEmpty
+        ? typedModel
+        : recommendedModel(_service, models);
+    if (model == null) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _askModel = true;
+        _error = strings.noModelFound;
+      });
+      return;
+    }
+
+    final config = base.withModel(model);
+    try {
+      await createLlm(config).testConnection();
+    } on LlmException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = strings.aiFailure(e.kind, e.message);
+      });
+      return;
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = '$e';
+      });
+      return;
+    }
+
+    await ref.read(aiConfigProvider.notifier).attach(config, models: models);
+    if (!mounted) return;
+    FocusScope.of(context).unfocus();
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('${strings.connectedTo(_serviceName(_service))} · $model'),
+    ));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final custom = _service == AiService.custom;
+    final keyUrl = _service.keyUrl;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(context.s.aiBlurb),
+        const SizedBox(height: 12),
+        InputDecorator(
+          decoration: InputDecoration(
+            labelText: context.s.service,
+            border: const OutlineInputBorder(),
+            isDense: true,
+          ),
+          child: DropdownButtonHideUnderline(
+            child: DropdownButton<AiService>(
+              isExpanded: true,
+              value: _service,
+              items: [
+                for (final s in AiService.values)
+                  DropdownMenuItem(
+                    value: s,
+                    child: Text.rich(
+                      TextSpan(children: [
+                        TextSpan(text: s.label),
+                        if (s.freeTier)
+                          TextSpan(
+                            text: '  · ${context.s.freeTier}',
+                            style: TextStyle(color: theme.colorScheme.primary),
+                          ),
+                      ]),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              onChanged: _busy
+                  ? null
+                  : (s) => setState(() {
+                        _service = s!;
+                        _keyHint = null;
+                        _error = null;
+                      }),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _keyController,
+          obscureText: _obscure,
+          autocorrect: false,
+          enableSuggestions: false,
+          onChanged: _onKeyChanged,
+          decoration: InputDecoration(
+            labelText: custom ? context.s.apiKeyOptional : context.s.apiKey,
+            helperText: _keyHint,
+            border: const OutlineInputBorder(),
+            suffixIcon: IconButton(
+              icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
+              onPressed: () => setState(() => _obscure = !_obscure),
+            ),
+          ),
+        ),
+        if (custom) ...[
+          const SizedBox(height: 12),
+          TextField(
+            controller: _urlController,
+            autocorrect: false,
+            keyboardType: TextInputType.url,
+            decoration: InputDecoration(
+              labelText: context.s.serverAddress,
+              hintText: 'http://localhost:11434/v1',
+              border: const OutlineInputBorder(),
+            ),
+          ),
+        ],
+        if (custom || _askModel) ...[
+          const SizedBox(height: 12),
+          TextField(
+            controller: _modelController,
+            autocorrect: false,
+            decoration: InputDecoration(
+              labelText: context.s.modelName,
+              border: const OutlineInputBorder(),
+            ),
+          ),
+        ],
+        if (keyUrl != null)
+          TextButton.icon(
+            onPressed: () => launchUrl(Uri.parse(keyUrl),
+                mode: LaunchMode.externalApplication),
+            icon: const Icon(Icons.open_in_new, size: 18),
+            label: Text(context.s.getKey(_serviceName(_service))),
+          )
+        else
+          const SizedBox(height: 12),
+        Text(context.s.subscriptionNote, style: theme.textTheme.bodySmall),
+        if (_error != null) ...[
+          const SizedBox(height: 12),
+          Text(_error!, style: TextStyle(color: theme.colorScheme.error)),
+        ],
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerRight,
+          child: FilledButton.icon(
+            onPressed: _busy ? null : _connect,
+            icon: _busy
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2))
+                : const Icon(Icons.link),
+            label: Text(_busy ? context.s.testing : context.s.testAndConnect),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// The connected AI: model picker (from the key's own model list), a
+/// connection test, and the practice-question status.
+class _AiConnected extends ConsumerStatefulWidget {
+  const _AiConnected({required this.config});
+
+  final AiConfig config;
+
+  @override
+  ConsumerState<_AiConnected> createState() => _AiConnectedState();
+}
+
+class _AiConnectedState extends ConsumerState<_AiConnected> {
+  static const _otherModel = '\u0000other';
+  bool _testing = false;
+  bool _loadingModels = false;
+  bool? _testOk;
+  String? _testMessage;
+
+  Future<void> _test() async {
+    final strings = context.s;
+    setState(() {
+      _testing = true;
+      _testMessage = null;
+    });
+    bool ok = false;
+    String message;
+    try {
+      await createLlm(widget.config).testConnection();
+      ok = true;
+      message = strings.testOk;
+    } on LlmException catch (e) {
+      message = strings.aiFailure(e.kind, e.message);
+    } catch (e) {
+      message = '$e';
+    }
+    if (!mounted) return;
+    setState(() {
+      _testing = false;
+      _testOk = ok;
+      _testMessage = message;
+    });
+  }
+
+  Future<void> _refreshModels() async {
+    setState(() => _loadingModels = true);
+    try {
+      final models = await createLlm(widget.config).listModels();
+      await ref.read(aiConfigProvider.notifier).setModels(models);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _testOk = false;
+          _testMessage = e is LlmException
+              ? context.s.aiFailure(e.kind, e.message)
+              : '$e';
+        });
+      }
+    }
+    if (mounted) setState(() => _loadingModels = false);
+  }
+
+  Future<void> _typeModel() async {
+    final controller = TextEditingController(text: widget.config.model);
+    final model = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(context.s.modelName),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          autocorrect: false,
+          onSubmitted: (v) => Navigator.of(context).pop(v),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(context.s.cancel),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(controller.text),
+            child: Text(context.s.save),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (model != null && model.trim().isNotEmpty) {
+      await ref.read(aiConfigProvider.notifier).setModel(model.trim());
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final config = widget.config;
+    final theme = Theme.of(context);
+    final models = {
+      ...ref.read(aiConfigProvider.notifier).models,
+      config.model,
+    }.toList()
+      ..sort();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.check_circle, color: Color(0xFF2E9E4F)),
+            const SizedBox(width: 12),
+            Expanded(
+                child: Text(context.s.connectedTo(_serviceName(config.service)))),
+            TextButton.icon(
+              onPressed: () => ref.read(aiConfigProvider.notifier).detach(),
+              icon: const Icon(Icons.link_off),
+              label: Text(context.s.detach),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: InputDecorator(
+                decoration: InputDecoration(
+                  labelText: context.s.model,
+                  border: const OutlineInputBorder(),
+                  isDense: true,
+                ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    isExpanded: true,
+                    value: config.model,
+                    items: [
+                      for (final m in models)
+                        DropdownMenuItem(
+                          value: m,
+                          child: Text(m, overflow: TextOverflow.ellipsis),
+                        ),
+                      DropdownMenuItem(
+                        value: _otherModel,
+                        child: Text(context.s.otherModel,
+                            style: TextStyle(color: theme.colorScheme.primary)),
                       ),
                     ],
+                    onChanged: (m) {
+                      if (m == _otherModel) {
+                        _typeModel();
+                      } else if (m != null) {
+                        ref.read(aiConfigProvider.notifier).setModel(m);
+                      }
+                    },
                   ),
-                  const SizedBox(height: 8),
-                  InputDecorator(
-                    decoration: InputDecoration(
-                      labelText: context.s.model,
-                      border: OutlineInputBorder(),
-                      isDense: true,
-                    ),
-                    child: DropdownButtonHideUnderline(
-                      child: DropdownButton<String>(
-                        isExpanded: true,
-                        value: ref.watch(geminiModelProvider),
-                        items: [
-                          for (final m in kGeminiModels)
-                            DropdownMenuItem(value: m, child: Text(m)),
-                        ],
-                        onChanged: (m) {
-                          if (m != null) {
-                            ref.read(geminiModelProvider.notifier).set(m);
-                          }
-                        },
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const _QuizPrepStatus(),
-                ],
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(context.s.geminiBlurb),
-                  const SizedBox(height: 12),
-                  TextField(
-                    controller: _keyController,
-                    obscureText: _obscure,
-                    decoration: InputDecoration(
-                      labelText: context.s.geminiKey,
-                      border: const OutlineInputBorder(),
-                      suffixIcon: IconButton(
-                        icon: Icon(_obscure
-                            ? Icons.visibility
-                            : Icons.visibility_off),
-                        onPressed: () => setState(() => _obscure = !_obscure),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: FilledButton.icon(
-                      onPressed: _attach,
-                      icon: const Icon(Icons.link),
-                      label: Text(context.s.attach),
-                    ),
-                  ),
-                ],
+                ),
               ),
-      ),
+            ),
+            IconButton(
+              tooltip: context.s.refreshModels,
+              onPressed: _loadingModels ? null : _refreshModels,
+              icon: _loadingModels
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.refresh),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            OutlinedButton.icon(
+              onPressed: _testing ? null : _test,
+              icon: _testing
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.network_check, size: 18),
+              label: Text(_testing ? context.s.testing : context.s.testConnection),
+            ),
+          ],
+        ),
+        if (_testMessage != null) ...[
+          const SizedBox(height: 6),
+          Text(
+            _testMessage!,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: _testOk == true
+                  ? const Color(0xFF2E9E4F)
+                  : theme.colorScheme.error,
+            ),
+          ),
+        ],
+        const SizedBox(height: 12),
+        const _QuizPrepStatus(),
+      ],
     );
   }
 }

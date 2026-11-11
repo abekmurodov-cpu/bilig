@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:knowledge/src/llm/gemini_provider.dart';
+import 'package:knowledge/src/llm/http_llm.dart';
 import 'package:knowledge/src/llm/llm_provider.dart';
 import 'package:knowledge/src/llm/prompted_llm.dart';
 import 'package:knowledge/src/models/knowledge_item.dart';
@@ -196,7 +197,7 @@ void main() {
       });
       final llm = GeminiProvider(apiKey: 'k', client: client, sleep: (_) async {});
       await expectLater(llm.suggestCategory('front', null), throwsA(isA<LlmException>()));
-      expect(calls, GeminiProvider.maxRetries + 1);
+      expect(calls, HttpLlm.maxRetries + 1);
     });
   });
 
