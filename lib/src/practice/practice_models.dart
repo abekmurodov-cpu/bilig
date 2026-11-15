@@ -67,11 +67,15 @@ class PracticeConfig {
     required this.method,
     required this.scope,
     this.category,
+    this.topic,
   });
 
   final PracticeMethod method;
   final PracticeScope scope;
   final String? category;
+
+  /// With [category]: only this topic of it.
+  final String? topic;
 
   /// Builds the queue from [all] (every note) and [due] (currently-due notes),
   /// filtered by scope. Multiple-choice and type-the-answer need something to
@@ -87,8 +91,9 @@ class PracticeConfig {
       PracticeScope.all => all,
       PracticeScope.due => due,
       PracticeScope.weakPoints => all.where((i) => i.isWeak),
-      PracticeScope.category =>
-        all.where((i) => (i.category?.trim() ?? '') == category?.trim()),
+      PracticeScope.category => all.where((i) =>
+          (i.category?.trim() ?? '') == category?.trim() &&
+          (topic == null || i.topic == topic)),
     };
 
     if (method == PracticeMethod.fillBlank) {

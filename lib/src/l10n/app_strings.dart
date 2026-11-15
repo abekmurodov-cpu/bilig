@@ -166,6 +166,75 @@ class AppStrings {
       );
   String get generateAnswer =>
       _t('Generate answer', 'Javob yaratish', 'Сгенерировать ответ');
+  String get topic => _t('Topic', 'Mavzu', 'Тема');
+  String get topics => _t('Topics', 'Mavzular', 'Темы');
+  String get practiseAll => _t('Practise all', 'Hammasini mashq qilish', 'Повторить всё');
+  String get practiseTopic =>
+      _t('Practise this topic', 'Shu mavzuni mashq qilish', 'Повторить тему');
+  String get seeNotes => _t('See notes', 'Qaydlarni ko‘rish', 'Заметки');
+  String get addNote => _t('Add a note', 'Qayd qo‘shish', 'Добавить заметку');
+  String get renameCategory =>
+      _t('Rename category', 'Turkum nomini o‘zgartirish', 'Переименовать категорию');
+  String get renameTopic =>
+      _t('Rename topic', 'Mavzu nomini o‘zgartirish', 'Переименовать тему');
+  String get emptyRemovesTopic => _t('Leave empty to remove the topic',
+      'Mavzuni olib tashlash uchun bo‘sh qoldiring', 'Оставьте пустым, чтобы убрать тему');
+  String get sortIntoTopics =>
+      _t('Sort into topics', 'Mavzularga ajratish', 'Разбить на темы');
+  String get noTopics => _t(
+      'No topics yet. Add one when writing a note, or select notes in Notes '
+          '(long-press) and move them to a topic.',
+      'Hali mavzular yo‘q. Qayd yozayotganda mavzu qo‘shing yoki Qaydlar '
+          'bo‘limida qaydlarni tanlab (uzoq bosing) mavzuga o‘tkazing.',
+      'Тем пока нет. Добавьте тему при создании заметки или выделите заметки '
+          '(долгое нажатие) и перенесите их в тему.');
+  String get noTopicsAi => _t(
+      'No topics yet. Let the AI sort this course into topics, or add them yourself.',
+      'Hali mavzular yo‘q. AI bu kursni mavzularga ajratsin yoki o‘zingiz qo‘shing.',
+      'Тем пока нет. Пусть ИИ разобьёт курс на темы, или добавьте их сами.');
+  String withoutTopic(int n) =>
+      _t('$n without a topic', '$n tasi mavzusiz', 'Без темы: $n');
+  String sortingTopics(String c) => _t('Sorting “$c” into topics…',
+      '“$c” mavzularga ajratilmoqda…', 'Разбиваем «$c» на темы…');
+  String get sortTopicsBlurb => _t(
+      'Rename a topic with ✎, or tap a note to move it. Nothing changes until you apply.',
+      'Mavzu nomini ✎ bilan o‘zgartiring yoki qaydni bosib boshqa mavzuga o‘tkazing. '
+          'Qo‘llamaguningizcha hech narsa o‘zgarmaydi.',
+      'Переименуйте тему через ✎ или нажмите на заметку, чтобы перенести её. '
+          'Пока вы не примените, ничего не изменится.');
+  String applyTopics(int n) =>
+      _t('Apply $n topics', '$n ta mavzuni qo‘llash', 'Применить темы: $n');
+  String notesCount(int n) => _t(n == 1 ? '1 note' : '$n notes', '$n ta qayd', 'Заметок: $n');
+  String get tryAgain => _t('Try again', 'Qayta urinish', 'Повторить попытку');
+  String selectedCount(int n) => _t('$n selected', '$n ta tanlandi', 'Выбрано: $n');
+  String get moveTo => _t('Move to…', 'Ko‘chirish…', 'Переместить…');
+  String get move => _t('Move', 'Ko‘chirish', 'Переместить');
+  String moveNotes(int n) => _t(n == 1 ? 'Move 1 note' : 'Move $n notes',
+      '$n ta qaydni ko‘chirish', 'Переместить заметки: $n');
+  String deleteNotes(int n) => _t(n == 1 ? 'Delete 1 note?' : 'Delete $n notes?',
+      '$n ta qayd o‘chirilsinmi?', 'Удалить заметки: $n?');
+  String get dailyGoal => _t('Daily goal', 'Kunlik maqsad', 'Цель на день');
+  String reviewsADay(int n) =>
+      _t('$n reviews a day', 'Kuniga $n ta takrorlash', '$n повторений в день');
+  String goalLeft(int n) => _t('$n more to reach today’s goal',
+      'Bugungi maqsadgacha yana $n ta', 'До цели на сегодня: $n');
+  String get goalReached => _t('Today’s goal reached!', 'Bugungi maqsadga erishildi!',
+      'Цель на сегодня выполнена!');
+  String get recentlyAdded => _t('Recently added', 'Yaqinda qo‘shilgan', 'Недавно добавленные');
+  String get strugglingWith => _t('Struggling with', 'Qiyin bo‘layotganlar', 'Даются с трудом');
+  String get seeAll => _t('See all', 'Hammasi', 'Все');
+  String get practiseThese => _t('Practise these', 'Shularni mashq qilish', 'Повторить их');
+  String get allTopics => _t('All topics', 'Barcha mavzular', 'Все темы');
+  String get topicOptional =>
+      _t('Topic (optional)', 'Mavzu (ixtiyoriy)', 'Тема (необязательно)');
+  String get topicNeedsCategory => _t('Choose a category first',
+      'Avval turkumni tanlang', 'Сначала выберите категорию');
+  String get topicHint => _t('A part of the course, e.g. Cells',
+      'Kursning bir qismi, masalan: Hujayra', 'Часть курса, например: Клетка');
+  String get topicPickHint => _t('Pick a topic or type a new one',
+      'Mavzuni tanlang yoki yangisini yozing', 'Выберите тему или введите новую');
+  String get newTopic => _t('New topic', 'Yangi mavzu', 'Новая тема');
+  String get chooseTopic => _t('Choose a topic', 'Mavzuni tanlash', 'Выбрать тему');
   String get categoryHint => _t('e.g. Biology, History, Linux',
       'masalan: Biologiya, Tarix, Linux', 'например: Биология, История, Linux');
   String get categoryPickHint => _t('Pick one or type a new name',

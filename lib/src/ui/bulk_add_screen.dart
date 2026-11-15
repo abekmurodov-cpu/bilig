@@ -42,6 +42,7 @@ class BulkAddScreen extends ConsumerStatefulWidget {
 class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
   late final _text = TextEditingController(text: widget.initialText ?? '');
   final _category = TextEditingController();
+  final _topic = TextEditingController();
   late Uint8List? _image = widget.initialImage;
   List<NoteDraft>? _drafts;
   final Set<int> _keep = {};
@@ -69,6 +70,7 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
   void dispose() {
     _text.dispose();
     _category.dispose();
+    _topic.dispose();
     super.dispose();
   }
 
@@ -195,7 +197,8 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
     setState(() => _busy = true);
     await ref
         .read(knowledgeListProvider.notifier)
-        .addDrafts(chosen, category: _category.text, onlyMissing: _isImport);
+        .addDrafts(chosen,
+            category: _category.text, topic: _topic.text, onlyMissing: _isImport);
     if (!mounted) return;
     Navigator.of(context).pop(chosen.length);
     messenger.showSnackBar(SnackBar(content: Text(strings.savedNotes(chosen.length))));
@@ -349,9 +352,15 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
         if (i == drafts.length + 1) {
           return Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: CategoryField(
-              controller: _category,
-              labelText: _isImport ? strings.categoryForMissing : strings.categoryForAll,
+            child: Column(
+              children: [
+                CategoryField(
+                  controller: _category,
+                  labelText: _isImport ? strings.categoryForMissing : strings.categoryForAll,
+                ),
+                const SizedBox(height: 12),
+                TopicField(controller: _topic, category: _category),
+              ],
             ),
           );
         }

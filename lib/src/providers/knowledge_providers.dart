@@ -41,6 +41,7 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
     String? back,
     required KnowledgeType type,
     String? category,
+    String? topic,
     Uint8List? imageBytes,
     String? quizQuestion,
     String? mcAnswer,
@@ -67,6 +68,7 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
       back: back?.trim().isEmpty ?? true ? null : back!.trim(),
       type: type,
       category: _existingCategory(category),
+      topic: _existingTopic(category, topic),
       createdAt: now,
       dueDate: now, // due immediately so it appears in the first review
       hasImage: imageBytes != null,
@@ -87,9 +89,10 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
   /// with one list refresh. A [category] is given to every note, or with
   /// [onlyMissing] only to notes that have none.
   Future<void> addDrafts(List<NoteDraft> drafts,
-      {String? category, bool onlyMissing = false}) async {
+      {String? category, String? topic, bool onlyMissing = false}) async {
     final now = DateTime.now();
     final typed = _existingCategory(category);
+    final typedTopic = _existingTopic(category, topic);
     for (final d in drafts) {
       final back = d.back?.trim();
       final code = d.type == KnowledgeType.code ? back ?? '' : '';
@@ -102,6 +105,8 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
         category: onlyMissing
             ? (_existingCategory(d.category) ?? typed)
             : (typed ?? _existingCategory(d.category)),
+        // The topic goes with the typed category only.
+        topic: (onlyMissing ? d.category == null : typed != null) ? typedTopic : null,
         createdAt: now,
         dueDate: now,
         fillBlankTemplate: drills?.fillBlankTemplate,
@@ -240,6 +245,7 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
     String? back,
     required KnowledgeType type,
     String? category,
+    String? topic,
     List<String>? tags,
   }) async {
     final contentChanged = item.front != front.trim() ||
@@ -252,15 +258,16 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
     final base = contentChanged
         ? item.withoutAiQuizzes().copyWith(badQuestions: const [])
         : item;
-    final updated = base.copyWith(
-      front: newFront,
-      back: newBack,
-      type: type,
-      category: _existingCategory(category),
-      highlights: keptHighlights(item.highlights, newFront, newBack),
-      tags: tags,
-      updatedAt: DateTime.now(),
-    );
+    final updated = base
+        .copyWith(
+          front: newFront,
+          back: newBack,
+          type: type,
+          highlights: keptHighlights(item.highlights, newFront, newBack),
+          tags: tags,
+          updatedAt: DateTime.now(),
+        )
+        .withPlace(_existingCategory(category), _existingTopic(category, topic));
     await _repo.save(updated);
     await _refresh();
   }
@@ -294,6 +301,75 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
       if (c != null && c.toLowerCase() == key) return c;
     }
     return name;
+  }
+
+  /// [typed] as a topic of [category], matched to one already in use there
+  /// like [_existingCategory]; none without a category.
+  String? _existingTopic(String? category, String? typed) {
+    final inCategory = _existingCategory(category);
+    final name = typed?.trim().replaceAll(RegExp(r'\s+'), ' ') ?? '';
+    if (inCategory == null || name.isEmpty) return null;
+    final key = name.toLowerCase();
+    for (final item in state.asData?.value ?? const <KnowledgeItem>[]) {
+      final t = item.topic?.trim();
+      if (item.category == inCategory && t != null && t.toLowerCase() == key) return t;
+    }
+    return name;
+  }
+
+  /// Moves the notes with [ids] to [category] and [topic] (a topic only
+  /// with a category).
+  Future<void> moveNotes(Set<String> ids, String? category, String? topic) async {
+    final place = _existingCategory(category);
+    final inTopic = _existingTopic(category, topic);
+    final now = DateTime.now();
+    for (final item in state.asData?.value ?? const <KnowledgeItem>[]) {
+      if (!ids.contains(item.id)) continue;
+      await _repo.save(item.withPlace(place, inTopic).copyWith(updatedAt: now));
+    }
+    await _refresh();
+  }
+
+  /// Sets topics in [category] from [topicById] (note id → topic, or null
+  /// for no topic); other notes are untouched.
+  Future<void> setTopics(String category, Map<String, String?> topicById) async {
+    final now = DateTime.now();
+    for (final item in state.asData?.value ?? const <KnowledgeItem>[]) {
+      if (item.category != category || !topicById.containsKey(item.id)) continue;
+      final topic = topicById[item.id]?.trim();
+      if (topic == item.topic) continue;
+      await _repo.save(item
+          .withPlace(category, topic == null || topic.isEmpty ? null : topic)
+          .copyWith(updatedAt: now));
+    }
+    await _refresh();
+  }
+
+  /// Renames a category (merging into one of that name if it exists), or
+  /// with [topic], a topic within it. An empty [to] removes the topic.
+  Future<void> rename(String category, String to, {String? topic}) async {
+    final now = DateTime.now();
+    final name = to.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (topic == null && name.isEmpty) return;
+    final target = topic == null ? _existingCategory(name) : null;
+    final newTopic = topic == null ? null : _existingTopic(category, name);
+    for (final item in state.asData?.value ?? const <KnowledgeItem>[]) {
+      if (item.category != category) continue;
+      if (topic == null) {
+        await _repo.save(item.withPlace(target, item.topic).copyWith(updatedAt: now));
+      } else if (item.topic == topic) {
+        await _repo.save(item.withPlace(category, newTopic).copyWith(updatedAt: now));
+      }
+    }
+    if (topic == null && target != category) {
+      final exams = ref.read(examsProvider.notifier);
+      final date = ref.read(examsProvider)[category];
+      if (date != null) {
+        await exams.set(category, null);
+        await exams.set(target!, date);
+      }
+    }
+    await _refresh();
   }
 
   Future<void> _refresh() async {
@@ -384,6 +460,28 @@ final categoryInfoProvider = Provider<List<CategoryInfo>>((ref) {
               .reduce((a, b) => a.isAfter(b) ? a : b),
         ),
   ]..sort((a, b) => b.lastUsed.compareTo(a.lastUsed));
+  return out;
+});
+
+/// The topics of each category, most recently used first, with their notes.
+final topicInfoProvider = Provider<Map<String, List<CategoryInfo>>>((ref) {
+  final out = <String, List<CategoryInfo>>{};
+  for (final e in ref.watch(notesByCategoryProvider).entries) {
+    final byTopic = <String, List<KnowledgeItem>>{};
+    for (final n in e.value) {
+      final t = n.topic?.trim();
+      if (t != null && t.isNotEmpty) (byTopic[t] ??= []).add(n);
+    }
+    if (byTopic.isEmpty) continue;
+    out[e.key] = [
+      for (final t in byTopic.entries)
+        (
+          name: t.key,
+          count: t.value.length,
+          lastUsed: t.value.map((n) => n.createdAt).reduce((a, b) => a.isAfter(b) ? a : b),
+        ),
+    ]..sort((a, b) => b.lastUsed.compareTo(a.lastUsed));
+  }
   return out;
 });
 

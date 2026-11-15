@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:knowledge/src/models/knowledge_item.dart';
+import 'package:knowledge/src/llm/prompted_llm.dart';
 import 'package:knowledge/src/models/note_search.dart';
 import 'package:knowledge/src/practice/answer_matching.dart';
 import 'package:knowledge/src/practice/practice_models.dart';
@@ -56,6 +57,38 @@ void main() {
       expect(b.answers.length, lessThanOrEqualTo(maxTextBlanks));
       expect(b.answers, contains('1945'));
       expect(filled(b), contains('surrendered'));
+    });
+
+    test('never blanks vague words, the cue\'s words, or too much', () {
+      final spill = note('t', 'Technology Spillover',
+          back: 'When a tech company invents something great (like microchips or AI), '
+              'other companies learn from it and improve too. This is a Technology '
+              'Spillover (a positive externality).');
+      final others = [
+        spill,
+        for (var i = 0; i < 8; i++)
+          note('o$i', 'Market $i',
+              back: 'Many companies compete, and something about prices changes.'),
+      ];
+      final stats = WordStats(others);
+      for (var reps = 0; reps < 4; reps++) {
+        final b = textBlanks(note('t', spill.front, back: spill.back, reps: reps),
+            stats: stats)!;
+        expect(b.answers.length, lessThanOrEqualTo(2));
+        for (final a in b.answers) {
+          expect(['something', 'great', 'companies', 'Technology', 'Spillover'],
+              isNot(contains(a)));
+        }
+      }
+      final first = textBlanks(spill, stats: stats)!;
+      expect(first.answers, contains('externality'));
+    });
+
+    test('question answers found in the text are blanked first', () {
+      final b = textBlanks(note('q', 'TCP',
+              back: 'TCP opens a connection with a three-way handshake of SYN, SYN-ACK and ACK.')
+          .copyWith(quizQuestion: 'How does TCP open a connection?', mcAnswer: 'A three-way handshake'))!;
+      expect(b.answers, isNotEmpty);
     });
 
     test('works in Uzbek and Russian text', () {
@@ -151,6 +184,93 @@ void main() {
       expect(ids('', {'Biology'}), ['a', 'b']);
       expect(ids('osm', {'History', ''}), ['c', 'd']);
       expect(ids('osm', {}), ['a', 'c', 'd']);
+    });
+  });
+
+  group('topics', () {
+    Future<ProviderContainer> store(List<KnowledgeItem> notes) async {
+      final repo = FakeRepository();
+      for (final n in notes) {
+        await repo.save(n);
+      }
+      final c = ProviderContainer(overrides: [
+        knowledgeRepositoryProvider.overrideWithValue(repo),
+      ]);
+      await c.read(knowledgeListProvider.future);
+      return c;
+    }
+
+    List<KnowledgeItem> all(ProviderContainer c) =>
+        c.read(knowledgeListProvider).requireValue;
+
+    test('a note keeps its topic through saving, and a topic needs a category', () async {
+      final c = await store([note('a', 'Osmosis', category: 'Biology').withPlace('Biology', 'Cells')]);
+      addTearDown(c.dispose);
+      final store_ = c.read(knowledgeListProvider.notifier);
+      await store_.addItem(
+          front: 'Mitosis', type: KnowledgeType.concept, category: 'biology', topic: ' cells ');
+      await store_.addItem(front: 'Loose', type: KnowledgeType.fact, topic: 'Cells');
+      final byFront = {for (final n in all(c)) n.front: n};
+      expect(byFront['Mitosis']!.category, 'Biology');
+      expect(byFront['Mitosis']!.topic, 'Cells');
+      expect(byFront['Loose']!.topic, isNull);
+      expect(KnowledgeItem.fromMap(byFront['Mitosis']!.toMap()).topic, 'Cells');
+      expect(c.read(topicInfoProvider)['Biology']!.single.count, 2);
+    });
+
+    test('moving, sorting and renaming', () async {
+      final c = await store([
+        note('a', 'Osmosis', category: 'Biology'),
+        note('b', 'Mendel', category: 'Biology'),
+        note('c', 'Rome', category: 'History'),
+      ]);
+      addTearDown(c.dispose);
+      final s = c.read(knowledgeListProvider.notifier);
+      await s.setTopics('Biology', {'a': 'Cells', 'b': 'Genetics'});
+      await s.moveNotes({'c'}, 'Biology', 'genetics');
+      var byId = {for (final n in all(c)) n.id: n};
+      expect([byId['a']!.topic, byId['b']!.topic, byId['c']!.topic],
+          ['Cells', 'Genetics', 'Genetics']);
+      expect(byId['c']!.category, 'Biology');
+
+      await s.rename('Biology', 'Heredity', topic: 'Genetics');
+      await s.rename('Biology', 'Bio');
+      byId = {for (final n in all(c)) n.id: n};
+      expect(byId['b']!.category, 'Bio');
+      expect(byId['b']!.topic, 'Heredity');
+      expect(byId['a']!.topic, 'Cells');
+
+      await s.rename('Bio', '', topic: 'Cells');
+      expect({for (final n in all(c)) n.id: n}['a']!.topic, isNull);
+
+      // Editing a note can clear its category.
+      await s.updateItem(byId['c']!, front: 'Rome', type: KnowledgeType.fact, category: '');
+      final c2 = {for (final n in all(c)) n.id: n}['c']!;
+      expect((c2.category, c2.topic), (null, null));
+    });
+
+    test('practice and search narrow to one topic', () {
+      final notes = [
+        note('a', 'Osmosis', back: 'Water moves.', category: 'Bio').withPlace('Bio', 'Cells'),
+        note('b', 'Mendel', back: 'Peas.', category: 'Bio').withPlace('Bio', 'Genetics'),
+        note('c', 'Mitosis', back: 'Division.', category: 'Bio'),
+      ];
+      const config = PracticeConfig(
+          method: PracticeMethod.flashcard,
+          scope: PracticeScope.category,
+          category: 'Bio',
+          topic: 'Cells');
+      expect(config.buildQueue(all: notes, due: const []).map((n) => n.id), ['a']);
+      expect([for (final n in searchNotes(notes, '', categories: {topicKey('Bio', 'Genetics')})) n.id],
+          ['b']);
+      expect(searchNotes(notes, '', categories: {'Bio'}).length, 3);
+    });
+
+    test("the AI's topics are read by note number", () {
+      final notes = [note('a', 'Osmosis'), note('b', 'Mendel'), note('c', 'Mitosis')];
+      final topics = PromptedLlm.parseTopics(notes,
+          '{"topics": [{"name": "Cells", "notes": [1, 3, 9]}, {"name": "Genetics", "notes": ["2"]}]}');
+      expect(topics, {'a': 'Cells', 'c': 'Cells', 'b': 'Genetics'});
     });
   });
 }

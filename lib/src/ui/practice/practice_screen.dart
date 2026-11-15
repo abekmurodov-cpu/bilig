@@ -19,12 +19,14 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
   PracticeMethod _method = PracticeMethod.flashcard;
   PracticeScope _scope = PracticeScope.all;
   String? _category;
+  String? _topic;
 
   void _start() {
     final config = PracticeConfig(
       method: _method,
       scope: _scope,
       category: _category,
+      topic: _topic,
     );
     final all = ref.read(notesSortedProvider);
     final due = ref.read(dueItemsProvider);
@@ -45,10 +47,11 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
   }
 
   /// How many cards [scope] would give with the chosen method.
-  int _count(PracticeScope scope, String? category) => PracticeConfig(
+  int _count(PracticeScope scope, String? category, [String? topic]) => PracticeConfig(
         method: _method,
         scope: scope,
         category: category,
+        topic: topic,
       )
           .buildQueue(
             all: ref.watch(notesSortedProvider),
@@ -63,7 +66,8 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
     final theme = Theme.of(context);
     final categories = ref.watch(categoryInfoProvider);
     final needsCategory = _scope == PracticeScope.category && _category == null;
-    final cards = needsCategory ? 0 : _count(_scope, _category);
+    final cards = needsCategory ? 0 : _count(_scope, _category, _topic);
+    final topics = ref.watch(topicInfoProvider)[_category] ?? const [];
     Widget heading(String text, {Widget? extra}) => Padding(
           padding: const EdgeInsets.fromLTRB(4, 20, 4, 10),
           child: Row(
@@ -148,10 +152,36 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
                       showCheckmark: false,
                       label: Text('${c.name} · ${c.count}'),
                       selected: _category == c.name,
-                      onSelected: (_) => setState(() => _category = c.name),
+                      onSelected: (_) => setState(() {
+                        _category = c.name;
+                        _topic = null;
+                      }),
                     ),
                 ],
               ),
+            if (topics.isNotEmpty) ...[
+              heading(strings.topic),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  ChoiceChip(
+                    showCheckmark: false,
+                    label: Text(strings.allTopics),
+                    selected: _topic == null,
+                    onSelected: (_) => setState(() => _topic = null),
+                  ),
+                  for (final t in topics)
+                    ChoiceChip(
+                      avatar: const Icon(Icons.account_tree_outlined, size: 18),
+                      showCheckmark: false,
+                      label: Text('${t.name} · ${t.count}'),
+                      selected: _topic == t.name,
+                      onSelected: (_) => setState(() => _topic = t.name),
+                    ),
+                ],
+              ),
+            ],
           ],
         ],
       ),

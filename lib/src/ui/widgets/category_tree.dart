@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_strings.dart';
 import '../../models/knowledge_item.dart';
 import '../../providers/knowledge_providers.dart';
+import 'category_sheet.dart';
 import 'share_category.dart';
 import 'tree_model.dart';
 
@@ -95,6 +96,15 @@ class CategoryTree extends StatelessWidget {
   final void Function(KnowledgeItem) onLeafTap;
   final double maxHeight;
 
+  /// Topic → how many of these notes are in it.
+  Map<String, int> get _topics {
+    final out = <String, int>{};
+    for (final n in notes) {
+      if (n.topic != null) out[n.topic!] = (out[n.topic!] ?? 0) + 1;
+    }
+    return out;
+  }
+
   void _openViewer(BuildContext context, List<KnowledgeItem> ordered,
       TreeModel model) {
     Navigator.of(context).push(MaterialPageRoute(
@@ -127,13 +137,29 @@ class CategoryTree extends StatelessWidget {
                     size: 18, color: theme.colorScheme.primary),
                 const SizedBox(width: 6),
                 Expanded(
-                  child: Text(
-                    _displayName(context, category),
-                    style: theme.textTheme.titleMedium,
-                    overflow: TextOverflow.ellipsis,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(8),
+                    onTap: () => showCategorySheet(context, category),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              _displayName(context, category),
+                              style: theme.textTheme.titleMedium,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text('${notes.length}', style: theme.textTheme.labelMedium),
+                          Icon(Icons.chevron_right,
+                              size: 18, color: theme.colorScheme.outline),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
-                Text('${notes.length}', style: theme.textTheme.labelMedium),
                 IconButton(
                   tooltip: context.s.shareCategory,
                   icon: const Icon(Icons.ios_share, size: 20),
@@ -147,6 +173,23 @@ class CategoryTree extends StatelessWidget {
               ],
             ),
           ),
+          if (_topics.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: [
+                  for (final t in _topics.entries)
+                    Chip(
+                      avatar: const Icon(Icons.account_tree_outlined, size: 14),
+                      label: Text('${t.key} · ${t.value}'),
+                      visualDensity: VisualDensity.compact,
+                      labelStyle: theme.textTheme.labelSmall,
+                    ),
+                ],
+              ),
+            ),
           LayoutBuilder(
             builder: (context, constraints) {
               final width = constraints.maxWidth;

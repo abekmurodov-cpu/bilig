@@ -7,7 +7,7 @@ import '../../l10n/app_strings.dart';
 import '../../models/knowledge_item.dart';
 import '../../providers/knowledge_providers.dart';
 import 'category_tree.dart';
-import 'note_detail_sheet.dart';
+import 'category_sheet.dart';
 import 'tree_model.dart';
 
 /// Every category as one garden: the trees side by side on a shared ground,
@@ -123,14 +123,7 @@ class _ForestTree extends StatelessWidget {
     // The tree's base sits on the ground line.
     final baseFromBottom = (model.size.height - model.groundY) * scale;
     return GestureDetector(
-      onTap: () => Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => TreeViewerScreen(
-          category: category,
-          notes: notes,
-          model: model,
-          onLeafTap: (note) => showNoteDetailSheet(context, note),
-        ),
-      )),
+      onTap: () => showCategorySheet(context, category),
       child: SizedBox(
         width: width + 8,
         child: Column(

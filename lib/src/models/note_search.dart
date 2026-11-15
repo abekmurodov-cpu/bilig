@@ -3,7 +3,8 @@ import 'knowledge_item.dart';
 /// Notes matching [query] (every word must appear somewhere in the note:
 /// prompt, answer, category, tags or its questions; case- and
 /// accent-insensitive), carrying every tag in [tags] and, when [categories]
-/// isn't empty, in one of those categories ('' for notes without one).
+/// isn't empty, in one of those categories ('' for notes without one) or
+/// topics ([topicKey]s).
 /// Prompt matches come first.
 List<KnowledgeItem> searchNotes(List<KnowledgeItem> notes, String query,
     {Set<String> tags = const {}, Set<String> categories = const {}}) {
@@ -11,8 +12,13 @@ List<KnowledgeItem> searchNotes(List<KnowledgeItem> notes, String query,
   final wanted = {for (final t in tags) t.toLowerCase()};
   final hits = <(KnowledgeItem, int)>[];
   for (final note in notes) {
-    if (categories.isNotEmpty && !categories.contains(note.category?.trim() ?? '')) {
-      continue;
+    if (categories.isNotEmpty) {
+      final category = note.category?.trim() ?? '';
+      final topic = note.topic;
+      if (!categories.contains(category) &&
+          (topic == null || !categories.contains(topicKey(category, topic)))) {
+        continue;
+      }
     }
     if (wanted.isNotEmpty) {
       final have = {for (final t in note.tags) t.toLowerCase()};
@@ -38,6 +44,9 @@ List<KnowledgeItem> searchNotes(List<KnowledgeItem> notes, String query,
     ..sort((a, b) => b.$1.$2 != a.$1.$2 ? b.$1.$2 - a.$1.$2 : a.$2 - b.$2);
   return [for (final h in indexed) h.$1.$1];
 }
+
+/// A topic as a search filter entry, alongside category names.
+String topicKey(String category, String topic) => '$category\u001f$topic';
 
 const _accents = {
   'á': 'a', 'à': 'a', 'â': 'a', 'ä': 'a', 'ã': 'a', 'é': 'e', 'è': 'e', 'ê': 'e',

@@ -69,6 +69,7 @@ class KnowledgeItem {
     this.back,
     required this.type,
     this.category,
+    this.topic,
     required this.createdAt,
     required this.dueDate,
     this.lastReviewedAt,
@@ -99,6 +100,10 @@ class KnowledgeItem {
   final String? back;
   final KnowledgeType type;
   final String? category;
+
+  /// A part of the [category] ("Cells" in "Biology"), to study on its own.
+  /// Only meaningful with a category.
+  final String? topic;
   final DateTime createdAt;
 
   // --- Spaced-repetition state (SM-2) ---
@@ -334,6 +339,7 @@ class KnowledgeItem {
     String? back,
     KnowledgeType? type,
     String? category,
+    String? topic,
     DateTime? dueDate,
     DateTime? lastReviewedAt,
     int? repetitions,
@@ -362,6 +368,7 @@ class KnowledgeItem {
       back: back ?? this.back,
       type: type ?? this.type,
       category: category ?? this.category,
+      topic: topic ?? this.topic,
       createdAt: createdAt,
       dueDate: dueDate ?? this.dueDate,
       lastReviewedAt: lastReviewedAt ?? this.lastReviewedAt,
@@ -388,12 +395,23 @@ class KnowledgeItem {
     );
   }
 
+  /// This note moved to [category] and [topic] (either may be none; a topic
+  /// needs a category).
+  KnowledgeItem withPlace(String? category, String? topic) {
+    final map = toMap()
+      ..['category'] = category
+      ..remove('topic');
+    if (category != null && topic != null) map['topic'] = topic;
+    return KnowledgeItem.fromMap(map);
+  }
+
   Map<String, dynamic> toMap() => {
         'id': id,
         'front': front,
         'back': back,
         'type': type.name,
         'category': category,
+        if (topic != null) 'topic': topic,
         'createdAt': createdAt.toIso8601String(),
         'dueDate': dueDate.toIso8601String(),
         'lastReviewedAt': lastReviewedAt?.toIso8601String(),
@@ -428,6 +446,7 @@ class KnowledgeItem {
           orElse: () => KnowledgeType.fact,
         ),
         category: map['category'] as String?,
+        topic: map['topic'] as String?,
         createdAt: DateTime.parse(map['createdAt'] as String),
         dueDate: DateTime.parse(map['dueDate'] as String),
         lastReviewedAt: map['lastReviewedAt'] == null

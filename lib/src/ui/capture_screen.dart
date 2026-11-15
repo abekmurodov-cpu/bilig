@@ -15,11 +15,21 @@ import 'widgets/markable_text.dart';
 import 'widgets/voice_input.dart';
 
 class CaptureScreen extends ConsumerStatefulWidget {
-  const CaptureScreen({super.key, this.initialFront, this.initialBack});
+  const CaptureScreen({
+    super.key,
+    this.initialFront,
+    this.initialBack,
+    this.initialCategory,
+    this.initialTopic,
+  });
 
   /// Prefilled text, e.g. shared from another app.
   final String? initialFront;
   final String? initialBack;
+
+  /// Prefilled place, when adding from a category or topic.
+  final String? initialCategory;
+  final String? initialTopic;
 
   @override
   ConsumerState<CaptureScreen> createState() => _CaptureScreenState();
@@ -31,7 +41,8 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
     ..text = widget.initialFront ?? '';
   late final _backController = HighlightingController()
     ..text = widget.initialBack ?? '';
-  final _categoryController = TextEditingController();
+  late final _categoryController = TextEditingController(text: widget.initialCategory);
+  late final _topicController = TextEditingController(text: widget.initialTopic);
   final _tagsController = TextEditingController();
   KnowledgeType _type = KnowledgeType.concept;
   bool _saving = false;
@@ -99,6 +110,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
     _frontController.dispose();
     _backController.dispose();
     _categoryController.dispose();
+    _topicController.dispose();
     _tagsController.dispose();
     super.dispose();
   }
@@ -165,6 +177,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
           back: _backController.text,
           type: _type,
           category: _categoryController.text,
+          topic: _topicController.text,
           imageBytes: _imageBytes,
           highlights: _highlights,
           tags: KnowledgeItem.parseTags(_tagsController.text),
@@ -300,6 +313,8 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                     )
                   : null,
             ),
+            const SizedBox(height: 12),
+            TopicField(controller: _topicController, category: _categoryController),
             const SizedBox(height: 16),
             TextFormField(
               controller: _tagsController,

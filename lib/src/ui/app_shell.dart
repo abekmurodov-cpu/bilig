@@ -7,6 +7,7 @@ import '../capture/share_inbox.dart';
 import '../l10n/app_strings.dart';
 import '../llm/quiz_prep.dart';
 import '../platform/due_signals.dart';
+import '../providers/navigation.dart';
 import '../providers/knowledge_providers.dart';
 import '../sync/sync_providers.dart';
 import 'bulk_add_screen.dart';
@@ -28,7 +29,6 @@ class AppShell extends ConsumerStatefulWidget {
 }
 
 class _AppShellState extends ConsumerState<AppShell> {
-  int _index = 0;
 
   @override
   void initState() {
@@ -103,11 +103,22 @@ class _AppShellState extends ConsumerState<AppShell> {
     // Keeps the background quiz generator alive for the whole session.
     ref.listen(quizPrepProvider, (_, _) {});
     ref.listen(knowledgeListProvider, (_, _) => _scheduleSignals());
+    final tab = ref.watch(shellTabProvider);
+    final scheme = Theme.of(context).colorScheme;
+    // The bar has Capture in the middle: it opens a screen, not a tab.
+    const capture = 2;
     return Scaffold(
-      body: IndexedStack(index: _index, children: _tabs),
+      body: IndexedStack(index: tab, children: _tabs),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (i) => setState(() => _index = i),
+        selectedIndex: tab < capture ? tab : tab + 1,
+        onDestinationSelected: (i) {
+          if (i == capture) {
+            Navigator.of(context)
+                .push(MaterialPageRoute(builder: (_) => const CaptureScreen()));
+          } else {
+            ref.read(shellTabProvider.notifier).go(i < capture ? i : i - 1);
+          }
+        },
         destinations: [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
@@ -118,6 +129,18 @@ class _AppShellState extends ConsumerState<AppShell> {
             icon: Icon(Icons.park_outlined),
             selectedIcon: Icon(Icons.park),
             label: context.s.navNotes,
+          ),
+          NavigationDestination(
+            icon: Container(
+              width: 52,
+              height: 36,
+              decoration: BoxDecoration(
+                color: scheme.primary,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(Icons.add, color: scheme.onPrimary),
+            ),
+            label: context.s.capture,
           ),
           NavigationDestination(
             icon: Icon(Icons.fitness_center_outlined),

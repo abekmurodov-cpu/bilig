@@ -85,6 +85,9 @@ class _PracticeSessionScreenState
   // Fill-in-the-blank on an ordinary note (key words taken out of its text);
   // null for code notes, which blank code tokens instead.
   TextBlanks? _textBlanks;
+
+  /// Which words are common across the student's notes, for choosing blanks.
+  late final WordStats _wordStats = WordStats(ref.read(notesSortedProvider));
   // Reorder: current arrangement as indices into the note's reorderSegments.
   List<int> _reorderCurrent = [];
   // Shared "answered" result for objective modes.
@@ -209,7 +212,7 @@ class _PracticeSessionScreenState
       case PracticeMethod.typeAnswer:
         _selfCheck = !_canReveal;
       case PracticeMethod.fillBlank when _item.type != KnowledgeType.code:
-        _textBlanks = textBlanks(_item);
+        _textBlanks = textBlanks(_item, stats: _wordStats);
         _setupCoding();
       case PracticeMethod.fillBlank:
       case PracticeMethod.reorder:
@@ -1696,8 +1699,22 @@ class _InlineBlank extends StatelessWidget {
           borderRadius: BorderRadius.circular(4),
           border: Border.all(color: color),
         ),
-        child: Text(answer,
-            style: style.copyWith(color: color, fontWeight: FontWeight.w600)),
+        child: Text.rich(
+          TextSpan(children: [
+            // What was typed, struck through, before the right word.
+            if (!correct && controller.text.trim().isNotEmpty)
+              TextSpan(
+                text: '${controller.text.trim()} ',
+                style: style.copyWith(
+                    color: color.withValues(alpha: 0.7),
+                    decoration: TextDecoration.lineThrough,
+                    fontSize: (style.fontSize ?? 14) * 0.85),
+              ),
+            TextSpan(
+                text: answer,
+                style: style.copyWith(color: color, fontWeight: FontWeight.w600)),
+          ]),
+        ),
       );
     }
     return Container(

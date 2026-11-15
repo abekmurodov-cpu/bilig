@@ -42,6 +42,8 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
       TextEditingController(text: widget.item.back ?? '');
   late final TextEditingController _category =
       TextEditingController(text: widget.item.category ?? '');
+  late final TextEditingController _topic =
+      TextEditingController(text: widget.item.topic ?? '');
   late final TextEditingController _tags =
       TextEditingController(text: widget.item.tags.join(', '));
   late KnowledgeType _type = widget.item.type;
@@ -75,6 +77,7 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
     _front.dispose();
     _back.dispose();
     _category.dispose();
+    _topic.dispose();
     _tags.dispose();
     super.dispose();
   }
@@ -183,6 +186,7 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
           back: _back.text,
           type: _type,
           category: _category.text,
+          topic: _topic.text,
           tags: KnowledgeItem.parseTags(_tags.text),
         );
     if (mounted) setState(() => _editing = false);
@@ -301,7 +305,9 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
             if (item.category != null)
               Chip(
                 avatar: const Icon(Icons.folder_outlined, size: 16),
-                label: Text(item.category!),
+                label: Text(item.topic == null
+                    ? item.category!
+                    : '${item.category!} › ${item.topic!}'),
               ),
             for (final tag in item.tags)
               Chip(
@@ -350,6 +356,8 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
         ),
         const SizedBox(height: 12),
         CategoryField(controller: _category, labelText: context.s.category),
+        const SizedBox(height: 12),
+        TopicField(controller: _topic, category: _category),
         const SizedBox(height: 12),
         TextField(
           controller: _tags,

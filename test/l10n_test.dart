@@ -27,15 +27,13 @@ Widget app(AppLanguage language) => ProviderScope(
 
 void main() {
   testWidgets('home screen follows the chosen language', (tester) async {
-    for (final (lang, capture) in [
-      (AppLanguage.en, 'Capture'),
-      (AppLanguage.uz, 'Qo‘shish'),
-      (AppLanguage.ru, 'Добавить'),
-    ]) {
+    for (final lang in AppLanguage.values) {
       await tester.pumpWidget(app(lang));
       await tester.pumpAndSettle();
-      expect(find.text(capture), findsOneWidget, reason: lang.name);
+      expect(find.text(AppStrings(lang).emptyTitle), findsOneWidget, reason: lang.name);
     }
+    expect(AppStrings(AppLanguage.uz).emptyTitle,
+        isNot(AppStrings(AppLanguage.en).emptyTitle));
   });
 
   test('Russian plurals', () {

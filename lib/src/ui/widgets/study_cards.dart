@@ -16,12 +16,15 @@ const int quickCount = 5;
 
 /// Starts a flashcard session over [queue].
 void startSession(BuildContext context, List<KnowledgeItem> queue,
-    {PracticeScope scope = PracticeScope.due, String? category}) {
+    {PracticeScope scope = PracticeScope.due, String? category, String? topic}) {
   if (queue.isEmpty) return;
   Navigator.of(context).push(MaterialPageRoute(
     builder: (_) => PracticeSessionScreen(
       config: PracticeConfig(
-          method: PracticeMethod.flashcard, scope: scope, category: category),
+          method: PracticeMethod.flashcard,
+          scope: scope,
+          category: category,
+          topic: topic),
       queue: queue,
     ),
   ));
@@ -33,76 +36,211 @@ List<KnowledgeItem> soonestDue(List<KnowledgeItem> all, int count) =>
         .take(count)
         .toList();
 
-/// Today's reviews: how many and how long, with "Review" and "Quick 5".
-/// Small sessions are what get a student to start.
+/// Today: the daily goal ring, the week's study days, what is due and how
+/// long it takes, with "Review" and "Quick 5". Small sessions are what get
+/// a student to start.
 class TodayCard extends ConsumerWidget {
   const TodayCard({super.key});
+
+  Future<void> _pickGoal(BuildContext context, WidgetRef ref) async {
+    final strings = context.s;
+    final current = ref.read(dailyGoalProvider);
+    final goal = await showDialog<int>(
+      context: context,
+      builder: (context) => SimpleDialog(
+        title: Text(strings.dailyGoal),
+        children: [
+          for (final g in DailyGoalNotifier.choices)
+            ListTile(
+              leading: Icon(g == current ? Icons.radio_button_checked : Icons.radio_button_off),
+              title: Text(strings.reviewsADay(g)),
+              onTap: () => Navigator.pop(context, g),
+            ),
+        ],
+      ),
+    );
+    if (goal != null) await ref.read(dailyGoalProvider.notifier).set(goal);
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = context.s;
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final due = ref.watch(dueItemsProvider);
     final all = ref.watch(notesSortedProvider);
+    final activity = ref.watch(activityProvider);
+    final goal = ref.watch(dailyGoalProvider);
+    final done = activity[dayKey(DateTime.now())]?.reviews ?? 0;
     final minutes = (due.length * _perCard.inSeconds / 60).ceil();
     final quick = due.isNotEmpty
         ? due.take(quickCount).toList()
         : soonestDue(all, quickCount);
+    final onCard = scheme.onPrimaryContainer;
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-      padding: const EdgeInsets.fromLTRB(16, 14, 12, 12),
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 6),
+      padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
       decoration: BoxDecoration(
-        color: due.isEmpty ? scheme.surfaceContainerHighest : scheme.primaryContainer,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(24),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [scheme.primaryContainer, scheme.tertiaryContainer],
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(due.isEmpty ? Icons.check_circle_outline : Icons.bolt,
-                  color: scheme.onPrimaryContainer),
-              const SizedBox(width: 10),
+              Tooltip(
+                message: strings.dailyGoal,
+                child: InkWell(
+                  customBorder: const CircleBorder(),
+                  onTap: () => _pickGoal(context, ref),
+                  child: SizedBox(
+                    width: 72,
+                    height: 72,
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        TweenAnimationBuilder<double>(
+                          tween: Tween(end: (done / goal).clamp(0.0, 1.0)),
+                          duration: const Duration(milliseconds: 600),
+                          builder: (context, v, _) => CircularProgressIndicator(
+                            value: v,
+                            strokeWidth: 7,
+                            strokeCap: StrokeCap.round,
+                            color: done >= goal ? const Color(0xFF2E9E4F) : scheme.primary,
+                            backgroundColor: scheme.surface.withValues(alpha: 0.6),
+                          ),
+                        ),
+                        Center(
+                          child: done >= goal
+                              ? const Icon(Icons.check_rounded,
+                                  size: 30, color: Color(0xFF2E9E4F))
+                              : Text('$done/$goal',
+                                  style: theme.textTheme.labelLarge?.copyWith(
+                                      color: onCard, fontWeight: FontWeight.w700)),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       due.isEmpty ? strings.allCaughtUp : strings.dueToday(due.length),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          color: scheme.onPrimaryContainer,
-                          fontWeight: FontWeight.w600),
+                      style: theme.textTheme.titleLarge
+                          ?.copyWith(color: onCard, fontWeight: FontWeight.w700),
                     ),
+                    const SizedBox(height: 2),
                     Text(
                       due.isEmpty ? strings.practiseAhead : strings.aboutMinutes(minutes),
-                      style: TextStyle(color: scheme.onPrimaryContainer),
+                      style: theme.textTheme.bodyMedium?.copyWith(color: onCard),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      done >= goal ? strings.goalReached : strings.goalLeft(goal - done),
+                      style: theme.textTheme.labelMedium
+                          ?.copyWith(color: onCard.withValues(alpha: 0.75)),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 8,
-            runSpacing: 4,
-            alignment: WrapAlignment.end,
+          const SizedBox(height: 14),
+          _WeekStrip(activity: activity),
+          const SizedBox(height: 14),
+          Row(
             children: [
               if (quick.isNotEmpty)
-                OutlinedButton.icon(
-                  onPressed: () => startSession(context, quick),
-                  icon: const Icon(Icons.timer_outlined, size: 18),
-                  label: Text(strings.quickFive),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                        foregroundColor: onCard,
+                        side: BorderSide(color: onCard.withValues(alpha: 0.3))),
+                    onPressed: () => startSession(context, quick),
+                    icon: const Icon(Icons.timer_outlined, size: 18),
+                    label: Text(strings.quickFive),
+                  ),
                 ),
+              if (quick.isNotEmpty && due.isNotEmpty) const SizedBox(width: 10),
               if (due.isNotEmpty)
-                FilledButton(
-                  onPressed: () => startSession(context, due),
-                  child: Text(strings.review),
+                Expanded(
+                  child: FilledButton.icon(
+                    onPressed: () => startSession(context, due),
+                    icon: const Icon(Icons.play_arrow_rounded),
+                    label: Text(strings.review),
+                  ),
                 ),
             ],
           ),
         ],
       ),
+    );
+  }
+}
+
+/// This week, a day a column: filled when studied, ringed for today.
+class _WeekStrip extends StatelessWidget {
+  const _WeekStrip({required this.activity});
+
+  final Map<String, DayActivity> activity;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final local = MaterialLocalizations.of(context);
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    // Weekday of today counted from the locale's first day of the week.
+    final first = local.firstDayOfWeekIndex; // 0 = Sunday
+    final offset = (today.weekday % 7 - first + 7) % 7;
+    final start = DateTime(today.year, today.month, today.day - offset);
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        for (var i = 0; i < 7; i++)
+          Builder(builder: (context) {
+            final day = DateTime(start.year, start.month, start.day + i);
+            final studied = activity.containsKey(dayKey(day));
+            final isToday = day == today;
+            final future = day.isAfter(today);
+            return Column(
+              children: [
+                Text(local.narrowWeekdays[day.weekday % 7],
+                    style: theme.textTheme.labelSmall?.copyWith(
+                        color: scheme.onPrimaryContainer
+                            .withValues(alpha: future ? 0.4 : 0.8),
+                        fontWeight: isToday ? FontWeight.w800 : FontWeight.w500)),
+                const SizedBox(height: 4),
+                Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: studied
+                        ? const Color(0xFFF08C2E)
+                        : scheme.surface.withValues(alpha: future ? 0.25 : 0.5),
+                    border: isToday
+                        ? Border.all(color: scheme.onPrimaryContainer, width: 1.6)
+                        : null,
+                  ),
+                  child: studied
+                      ? const Icon(Icons.local_fire_department, size: 16, color: Colors.white)
+                      : null,
+                ),
+              ],
+            );
+          }),
+      ],
     );
   }
 }

@@ -116,6 +116,23 @@ final activityProvider =
     NotifierProvider<ActivityNotifier, Map<String, DayActivity>>(
         ActivityNotifier.new);
 
+/// Reviews a day the student aims for (the ring on Home).
+class DailyGoalNotifier extends Notifier<int> {
+  static const choices = [10, 20, 30, 50, 100];
+  static const fallback = 20;
+
+  @override
+  int build() =>
+      ref.read(settingsRepositoryProvider).getInt(SettingsRepository.kDailyGoal) ?? fallback;
+
+  Future<void> set(int goal) async {
+    state = goal;
+    await ref.read(settingsRepositoryProvider).setInt(SettingsRepository.kDailyGoal, goal);
+  }
+}
+
+final dailyGoalProvider = NotifierProvider<DailyGoalNotifier, int>(DailyGoalNotifier.new);
+
 /// Days in a row with at least one review, ending today (or yesterday, so a
 /// streak isn't "lost" before today's session).
 int currentStreak(Map<String, DayActivity> activity, {DateTime? now}) {

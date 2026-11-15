@@ -175,4 +175,8 @@ abstract class LlmProvider {
   /// Picks the few key words or ideas in [item] worth highlighting, copied
   /// exactly from the note's text.
   Future<List<String>> suggestHighlights(KnowledgeItem item);
+
+  /// Groups the notes of one course ([category]) into a few topics: note id
+  /// → topic name. Existing topic names are reused where they fit.
+  Future<Map<String, String>> suggestTopics(String category, List<KnowledgeItem> notes);
 }

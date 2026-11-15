@@ -5,6 +5,8 @@ import '../l10n/app_strings.dart';
 import '../models/knowledge_item.dart';
 import '../models/note_search.dart';
 import '../providers/knowledge_providers.dart';
+import '../providers/navigation.dart';
+import 'widgets/category_field.dart';
 import 'widgets/category_tree.dart';
 import 'widgets/item_tile.dart';
 import 'widgets/note_detail_sheet.dart';
@@ -27,8 +29,74 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   final _search = TextEditingController();
   final Set<String> _tags = {};
 
-  /// Chosen categories ('' stands for notes without one); none is all.
+  /// Chosen categories ('' stands for notes without one) and topics; none
+  /// is all.
   final Set<String> _categories = {};
+
+  /// Notes chosen to move or delete together (long-press starts choosing).
+  final Set<String> _selected = {};
+
+  void _toggleSelected(String id) => setState(
+      () => _selected.contains(id) ? _selected.remove(id) : _selected.add(id));
+
+  Future<void> _moveSelected() async {
+    final strings = context.s;
+    final category = TextEditingController();
+    final topic = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(strings.moveNotes(_selected.length)),
+        content: SizedBox(
+          width: 420,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CategoryField(controller: category, labelText: strings.category, showRecent: false),
+              const SizedBox(height: 12),
+              TopicField(controller: topic, category: category),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(strings.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(strings.move)),
+        ],
+      ),
+    );
+    if (ok == true) {
+      await ref
+          .read(knowledgeListProvider.notifier)
+          .moveNotes({..._selected}, category.text, topic.text);
+      if (mounted) setState(_selected.clear);
+    }
+    category.dispose();
+    topic.dispose();
+  }
+
+  Future<void> _deleteSelected() async {
+    final strings = context.s;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(strings.deleteNotes(_selected.length)),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(strings.cancel)),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
+            onPressed: () => Navigator.pop(context, true),
+            child: Text(strings.delete),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final store = ref.read(knowledgeListProvider.notifier);
+    for (final id in {..._selected}) {
+      await store.delete(id);
+    }
+    if (mounted) setState(_selected.clear);
+  }
 
   bool get _filtering =>
       _search.text.trim().isNotEmpty || _tags.isNotEmpty || _categories.isNotEmpty;
@@ -72,12 +140,53 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   @override
   Widget build(BuildContext context) {
     final strings = context.s;
+    // "See notes" from a category or topic elsewhere.
+    ref.listen(notesFilterRequestProvider, (_, request) {
+      if (request == null) return;
+      setState(() {
+        _categories
+          ..clear()
+          ..addAll(request);
+        _tags.clear();
+        _search.clear();
+        _view = _NotesView.list;
+        _visible = _pageSize;
+      });
+      ref.read(notesFilterRequestProvider.notifier).clear();
+    });
     final tags = ref.watch(tagsProvider);
     final groups = ref.watch(notesByCategoryProvider);
     final total = ref.watch(notesSortedProvider).length;
     final showFilters = tags.isNotEmpty || groups.length > 1;
     return Scaffold(
-      appBar: AppBar(
+      appBar: _selected.isNotEmpty
+          ? AppBar(
+              leading: IconButton(
+                tooltip: strings.cancel,
+                icon: const Icon(Icons.close),
+                onPressed: () => setState(_selected.clear),
+              ),
+              title: Text(strings.selectedCount(_selected.length)),
+              actions: [
+                IconButton(
+                  tooltip: strings.selectAll,
+                  icon: const Icon(Icons.select_all),
+                  onPressed: () => setState(() => _selected.addAll(_notes().map((n) => n.id))),
+                ),
+                IconButton(
+                  tooltip: strings.moveTo,
+                  icon: const Icon(Icons.drive_file_move_outlined),
+                  onPressed: _moveSelected,
+                ),
+                IconButton(
+                  tooltip: strings.delete,
+                  icon: const Icon(Icons.delete_outline),
+                  onPressed: _deleteSelected,
+                ),
+                const SizedBox(width: 4),
+              ],
+            )
+          : AppBar(
         title: Text(strings.navNotes),
         actions: [
           IconButton(
@@ -131,6 +240,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                         if (groups.length > 1) ...[
                           _CategoryFilter(
                             groups: groups,
+                            topics: ref.watch(topicInfoProvider),
                             selected: _categories,
                             onToggle: _toggleCategory,
                             onClear: () => setState(_categories.clear),
@@ -194,10 +304,15 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
           );
         }
         final item = notes[i];
+        final choosing = _selected.isNotEmpty;
         return ItemTile(
           item: item,
           showCategory: _categories.length != 1,
-          onTap: () => showNoteDetailSheet(context, item),
+          selected: choosing ? _selected.contains(item.id) : null,
+          onLongPress: () => _toggleSelected(item.id),
+          onTap: choosing
+              ? () => _toggleSelected(item.id)
+              : () => showNoteDetailSheet(context, item),
         );
       },
     );
@@ -299,12 +414,16 @@ class _NoResults extends StatelessWidget {
 class _CategoryFilter extends StatelessWidget {
   const _CategoryFilter({
     required this.groups,
+    required this.topics,
     required this.selected,
     required this.onToggle,
     required this.onClear,
   });
 
   final Map<String, List<KnowledgeItem>> groups;
+  final Map<String, List<CategoryInfo>> topics;
+
+  /// Category names and [topicKey]s.
   final Set<String> selected;
   final void Function(String category, bool on) onToggle;
   final VoidCallback onClear;
@@ -315,12 +434,14 @@ class _CategoryFilter extends StatelessWidget {
     String key(String group) => group == kUngroupedCategory ? '' : group;
     final label = switch (selected.length) {
       0 => strings.allCategories,
-      1 => selected.first.isEmpty ? strings.ungrouped : selected.first,
+      1 => selected.first.isEmpty
+          ? strings.ungrouped
+          : selected.first.replaceAll('\u001f', ' › '),
       final n => strings.categoriesChosen(n),
     };
     return MenuAnchor(
       menuChildren: [
-        for (final e in groups.entries)
+        for (final e in groups.entries) ...[
           CheckboxMenuButton(
             value: selected.contains(key(e.key)),
             closeOnActivate: false,
@@ -329,6 +450,19 @@ class _CategoryFilter extends StatelessWidget {
                 style: Theme.of(context).textTheme.labelMedium),
             child: Text(categoryDisplayName(context, e.key)),
           ),
+          for (final t in topics[e.key] ?? const <CategoryInfo>[])
+            CheckboxMenuButton(
+              value: selected.contains(topicKey(e.key, t.name)),
+              closeOnActivate: false,
+              onChanged: (on) => onToggle(topicKey(e.key, t.name), on ?? false),
+              trailingIcon: Text('${t.count}',
+                  style: Theme.of(context).textTheme.labelMedium),
+              child: Padding(
+                padding: const EdgeInsets.only(left: 20),
+                child: Text(t.name),
+              ),
+            ),
+        ],
         if (selected.isNotEmpty) ...[
           const Divider(height: 8),
           MenuItemButton(

@@ -371,6 +371,58 @@ abstract class PromptedLlm implements LlmProvider {
     return parseHighlights(item, [for (final h in list) '$h']);
   }
 
+  /// Most notes sent in one "sort into topics" request.
+  static const int maxNotesToSort = 150;
+
+  @override
+  Future<Map<String, String>> suggestTopics(
+      String category, List<KnowledgeItem> notes) async {
+    final batch = notes.take(maxNotesToSort).toList();
+    final existing = {for (final n in batch) if (n.topic != null) n.topic!};
+    final list = StringBuffer();
+    for (var i = 0; i < batch.length; i++) {
+      final n = batch[i];
+      final back = n.back == null ? '' : ' — ${_clip(n.back!.replaceAll('\n', ' '))}';
+      list.writeln('${i + 1}. ${_clip(n.front.replaceAll('\n', ' '))}$back');
+    }
+    final raw = await complete(
+      'A student\'s course "$category" has the notes below. Group them into '
+      '3-8 topics (sections of the course a student would study separately). '
+      'Topic names: 1-3 words, Title Case, in the language of the notes.'
+      '${existing.isEmpty ? '' : ' Reuse these existing topic names where they fit: ${existing.join(', ')}.'}'
+      ' Every note gets exactly one topic.\n'
+      'Return JSON: {"topics": [{"name": "...", "notes": [1, 4, 7]}]}.\n\n'
+      'Notes:\n$list',
+      json: true,
+    );
+    return parseTopics(batch, raw);
+  }
+
+  /// Note id → topic from the AI's reply (note numbers are 1-based); notes
+  /// it left out or numbers it made up are skipped.
+  static Map<String, String> parseTopics(List<KnowledgeItem> notes, String raw) {
+    final decoded = decodeJsonLoose(raw);
+    final topics = decoded is Map ? decoded['topics'] : decoded;
+    if (topics is! List) {
+      throw const LlmException(LlmErrorKind.badResponse, 'The AI returned no topics');
+    }
+    final out = <String, String>{};
+    for (final t in topics) {
+      if (t is! Map) continue;
+      final name = '${t['name'] ?? ''}'.trim();
+      final members = t['notes'];
+      if (name.isEmpty || members is! List) continue;
+      for (final m in members) {
+        final i = (m is num ? m.toInt() : int.tryParse('$m') ?? 0) - 1;
+        if (i >= 0 && i < notes.length) out.putIfAbsent(notes[i].id, () => name);
+      }
+    }
+    if (out.isEmpty) {
+      throw const LlmException(LlmErrorKind.badResponse, 'The AI returned no topics');
+    }
+    return out;
+  }
+
   /// Keeps the suggestions that really occur in the note (models sometimes
   /// paraphrase), trimmed, without repeats, at most [maxSuggestedHighlights].
   static List<String> parseHighlights(KnowledgeItem item, List<String> raw) {

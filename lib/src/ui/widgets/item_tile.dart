@@ -8,10 +8,21 @@ import 'category_tree.dart';
 /// stands (new, due, or when it comes back) and its category. Shared between
 /// Home and Notes; delete lives in the note's sheet.
 class ItemTile extends StatelessWidget {
-  const ItemTile({super.key, required this.item, this.onTap, this.showCategory = true});
+  const ItemTile({
+    super.key,
+    required this.item,
+    this.onTap,
+    this.onLongPress,
+    this.selected,
+    this.showCategory = true,
+  });
 
   final KnowledgeItem item;
   final VoidCallback? onTap;
+  final VoidCallback? onLongPress;
+
+  /// While choosing notes: whether this one is chosen (null otherwise).
+  final bool? selected;
 
   /// Off where notes are already grouped by category.
   final bool showCategory;
@@ -22,15 +33,31 @@ class ItemTile extends StatelessWidget {
     final scheme = theme.colorScheme;
     final muted = theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
     final (statusColor, status) = _status(context);
+    final chosen = selected ?? false;
     return Card(
+      color: chosen ? scheme.primaryContainer : null,
+      shape: chosen
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(18),
+              side: BorderSide(color: scheme.primary, width: 1.5))
+          : null,
       child: InkWell(
         onTap: onTap,
+        onLongPress: onLongPress,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(14, 14, 16, 12),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              TypeChip(type: item.type),
+              if (selected != null)
+                SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: Icon(chosen ? Icons.check_circle : Icons.radio_button_unchecked,
+                      color: chosen ? scheme.primary : scheme.outline),
+                )
+              else
+                TypeChip(type: item.type),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -68,7 +95,10 @@ class ItemTile extends StatelessWidget {
                           Icon(Icons.folder_outlined, size: 13, color: scheme.outline),
                           const SizedBox(width: 3),
                           Flexible(
-                            child: Text(item.category!,
+                            child: Text(
+                                item.topic == null
+                                    ? item.category!
+                                    : '${item.category!} › ${item.topic!}',
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                                 style: theme.textTheme.labelSmall
