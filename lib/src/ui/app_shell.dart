@@ -1,13 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../capture/share_inbox.dart';
 import '../l10n/app_strings.dart';
 import '../llm/quiz_prep.dart';
+import '../platform/due_signals.dart';
 import '../providers/knowledge_providers.dart';
 import '../sync/sync_providers.dart';
 import 'bulk_add_screen.dart';
 import 'capture_screen.dart';
+import 'data_section.dart';
 import 'home_screen.dart';
 import 'notes_screen.dart';
 import 'practice/practice_screen.dart';
@@ -32,6 +36,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     // Best-effort silent pull on startup when a sync backend is attached.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       _autoSync();
+      _scheduleSignals();
       ShareInbox.listen(_openShared);
       final initial = await ShareInbox.takeInitial();
       if (initial != null) _openShared(initial);
@@ -44,7 +49,10 @@ class _AppShellState extends ConsumerState<AppShell> {
     if (!mounted) return;
     final image = content.image;
     final text = content.text ?? '';
-    if (image != null) {
+    final file = content.file;
+    if (file != null) {
+      openNotesFile(context, ref, content.fileName ?? 'shared.bilig', file);
+    } else if (image != null) {
       openBulkAdd(context, BulkSource.photo, image: image);
     } else if (text.length <= 160 && !text.contains('\n')) {
       Navigator.of(context).push(MaterialPageRoute(
@@ -72,10 +80,29 @@ class _AppShellState extends ConsumerState<AppShell> {
     SettingsScreen(),
   ];
 
+  Timer? _signalTimer;
+
+  @override
+  void dispose() {
+    _signalTimer?.cancel();
+    super.dispose();
+  }
+
+  /// Refreshes the Dock badge / home-screen widget shortly after notes
+  /// change (a review session changes them many times).
+  void _scheduleSignals() {
+    _signalTimer?.cancel();
+    _signalTimer = Timer(const Duration(seconds: 2), () {
+      if (!mounted) return;
+      DueSignals.update(ref.read(notesSortedProvider), context.s);
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     // Keeps the background quiz generator alive for the whole session.
     ref.listen(quizPrepProvider, (_, _) {});
+    ref.listen(knowledgeListProvider, (_, _) => _scheduleSignals());
     return Scaffold(
       body: IndexedStack(index: _index, children: _tabs),
       bottomNavigationBar: NavigationBar(

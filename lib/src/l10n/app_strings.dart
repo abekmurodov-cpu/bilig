@@ -332,6 +332,67 @@ class AppStrings {
         'Заполните пропуск в уме, затем откройте ответ и оцените себя.',
       );
 
+  // --- More attractive -------------------------------------------------------
+  String learnedOf(int n, int total) =>
+      _t('$n/$total learned', '$n/$total o‘zlashtirildi', 'выучено $n/$total');
+  String get progress => _t('Progress', 'Natijalar', 'Прогресс');
+  String dayStreak(int n) => _t(n == 1 ? 'day in a row' : 'days in a row',
+      'kun ketma-ket', _ruPlural(n, 'день подряд', 'дня подряд', 'дней подряд'));
+  String get bestStreak => _t('best streak', 'eng uzun seriya', 'лучшая серия');
+  String get rememberNow => _t('you’d remember right now', 'hozir eslay olasiz',
+      'вспомните прямо сейчас');
+  String get learned => _t('learned', 'o‘zlashtirilgan', 'выучено');
+  String get learning => _t('learning', 'o‘rganilmoqda', 'изучается');
+  String get newNotes => _t('new', 'yangi', 'новые');
+  String get activity => _t('Study days', 'O‘qigan kunlar', 'Дни занятий');
+  String get recallByWeek =>
+      _t('Correct answers by week', 'Haftalik to‘g‘ri javoblar', 'Верные ответы по неделям');
+  String get recallByWeekBlurb => _t('Share of reviews you got right.',
+      'Takrorlashlardagi to‘g‘ri javoblar ulushi.', 'Доля повторений с верным ответом.');
+  String get comingUp => _t('Reviews coming up', 'Kelgusi takrorlashlar', 'Предстоящие повторения');
+  String reviewsCount(int n) => _t(n == 1 ? '1 review' : '$n reviews', '$n ta takrorlash',
+      '$n ${_ruPlural(n, 'повторение', 'повторения', 'повторений')}');
+  String get less => _t('less', 'kam', 'меньше');
+  String get more => _t('more', 'ko‘p', 'больше');
+  String get noReviewsYet => _t('No reviews yet. Your weeks will show here.',
+      'Hali takrorlash yo‘q. Haftalaringiz shu yerda ko‘rinadi.',
+      'Повторений пока нет. Здесь появятся ваши недели.');
+  String get today => _t('Today', 'Bugun', 'Сегодня');
+  String addSharedTitle(String name) =>
+      _t('Add “$name”?', '“$name” qo‘shilsinmi?', 'Добавить «$name»?');
+  String addSharedBody(int n) => _t(
+        'A classmate shared $n notes. They’ll be added as new notes; ones you already have are skipped.',
+        'Kursdoshingiz $n ta qayd ulashdi. Ular yangi qayd sifatida qo‘shiladi; sizda borlari o‘tkazib yuboriladi.',
+        'Однокурсник поделился заметками: $n. Они добавятся как новые; уже имеющиеся будут пропущены.',
+      );
+  String get addNotes => _t('Add notes', 'Qo‘shish', 'Добавить');
+  String get shareCategory =>
+      _t('Share with classmates', 'Kursdoshlarga ulashish', 'Поделиться с однокурсниками');
+  String get shareAsFile => _t('Save or send as a file', 'Fayl sifatida saqlash yoki yuborish',
+      'Сохранить или отправить файлом');
+  String get shareAsFileBlurb => _t(
+        'A .bilig file without your progress. Classmates open it in Bilig.',
+        'Natijalaringizsiz .bilig fayl. Kursdoshlar uni Bilig’da ochadi.',
+        'Файл .bilig без вашего прогресса. Однокурсники откроют его в Bilig.',
+      );
+  String get sendToTelegram => _t('Send to my Telegram', 'Telegramimga yuborish',
+      'Отправить в мой Telegram');
+  String get sendToTelegramBlurb => _t(
+        'Posted to your Bilig chat, ready to forward to classmates.',
+        'Bilig chatingizga yuboriladi, kursdoshlarga uzatish uchun tayyor.',
+        'Придёт в ваш чат Bilig — останется переслать однокурсникам.',
+      );
+  String sentToTelegram(String name) => _t('“$name” is in your Telegram chat. Forward it to classmates.',
+      '“$name” Telegram chatingizda. Uni kursdoshlarga uzating.',
+      '«$name» в вашем чате Telegram. Перешлите его однокурсникам.');
+  String shareCaption(String name, int n) => _t(
+        '📚 $name · $n notes for Bilig. Open it in Bilig (Settings → Open a .bilig file), or share it to Bilig.',
+        '📚 $name · Bilig uchun $n ta qayd. Bilig’da oching (Sozlamalar → .bilig faylni ochish) yoki Bilig’ga ulashing.',
+        '📚 $name · $n заметок для Bilig. Откройте в Bilig (Настройки → Открыть файл .bilig) или поделитесь им в Bilig.',
+      );
+  String get widgetDue => _t('to review', 'ta takrorlash', 'к повторению');
+  String get garden => _t('Your garden', 'Bog‘ingiz', 'Ваш сад');
+
   // --- Easier to use --------------------------------------------------------
   String get undoGrade => _t('Undo last grade', 'Oxirgi bahoni bekor qilish',
       'Отменить последнюю оценку');

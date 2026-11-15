@@ -115,6 +115,20 @@ class TelegramSyncService {
     return utf8.decode(resp.bodyBytes);
   }
 
+  /// Posts a file to the chat without pinning it (sync is unaffected), e.g.
+  /// a shared category the student then forwards to classmates.
+  Future<void> sendFile(List<int> bytes, String filename, {String? caption}) async {
+    final req = http.MultipartRequest('POST', Uri.parse('$_apiBase/sendDocument'))
+      ..fields['chat_id'] = chatId
+      ..files.add(http.MultipartFile.fromBytes('document', bytes, filename: filename));
+    if (caption != null) req.fields['caption'] = caption;
+    final streamed = await _client.send(req);
+    final body = jsonDecode(await streamed.stream.bytesToString()) as Map<String, dynamic>;
+    if (body['ok'] != true) {
+      throw Exception('Telegram sendDocument failed: ${body['description']}');
+    }
+  }
+
   /// Uploads [json] as the new pinned database document.
   Future<void> push(String json) async {
     final req = http.MultipartRequest(

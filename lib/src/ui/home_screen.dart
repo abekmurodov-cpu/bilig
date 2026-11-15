@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../l10n/app_strings.dart';
 import '../providers/knowledge_providers.dart';
+import '../providers/study_providers.dart';
 import 'capture_screen.dart';
 import 'widgets/app_logo.dart';
+import 'stats_screen.dart';
+import 'widgets/forest_view.dart';
 import 'widgets/item_tile.dart';
 import 'widgets/note_detail_sheet.dart';
 import 'widgets/study_cards.dart';
@@ -27,6 +30,7 @@ class HomeScreen extends ConsumerWidget {
           ],
         ),
         actions: [
+          const _StreakButton(),
           if (items.isNotEmpty)
             IconButton(
               tooltip: context.s.examMode,
@@ -47,13 +51,14 @@ class HomeScreen extends ConsumerWidget {
           if (items.isEmpty) {
             return const _EmptyState();
           }
-          return Column(
-            children: [
-              const TodayCard(),
-              const ExamCards(),
-              Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
+          return CustomScrollView(
+            slivers: [
+              const SliverToBoxAdapter(child: TodayCard()),
+              const SliverToBoxAdapter(child: ExamCards()),
+              const SliverToBoxAdapter(child: ForestView()),
+              SliverPadding(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
+                sliver: SliverList.separated(
                   itemCount: items.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 4),
                   itemBuilder: (context, i) => ItemTile(
@@ -101,6 +106,33 @@ class _EmptyState extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// "🔥 7" when on a streak (a chart icon otherwise); opens Progress.
+class _StreakButton extends ConsumerWidget {
+  const _StreakButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final streak = currentStreak(ref.watch(activityProvider));
+    void open() => Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const StatsScreen()));
+    if (streak == 0) {
+      return IconButton(
+        tooltip: context.s.progress,
+        icon: const Icon(Icons.insights_outlined),
+        onPressed: open,
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: ActionChip(
+        tooltip: context.s.progress,
+        label: Text('🔥 $streak'),
+        onPressed: open,
       ),
     );
   }

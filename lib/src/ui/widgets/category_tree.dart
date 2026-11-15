@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_strings.dart';
 import '../../models/knowledge_item.dart';
 import '../../providers/knowledge_providers.dart';
+import 'share_category.dart';
 import 'tree_model.dart';
 
 /// Whether a note's leaf is "autumn" (needs training): never reviewed, last
@@ -19,13 +20,60 @@ Color leafColor(KnowledgeItem item, {DateTime? now}) =>
 const Color summerLeafColor = Color(0xFF3E9B3A);
 const Color autumnLeafColor = Color(0xFFE8A317);
 
+/// How a note's leaf looks.
+enum LeafLook {
+  /// Learned and not due: summer green.
+  green,
+
+  /// Needs training (new, missed, or due): autumn gold.
+  gold,
+
+  /// Overdue for days: brown, drooping.
+  wilting,
+
+  /// Overdue for weeks: lying on the ground under the tree.
+  fallen,
+}
+
+/// Days overdue after which a leaf wilts, and after which it falls.
+const int wiltAfterDays = 4;
+const int fallAfterDays = 14;
+
+LeafLook leafLook(KnowledgeItem item, {DateTime? now}) {
+  final at = now ?? DateTime.now();
+  if (item.lastReviewedAt != null && item.isDue(at)) {
+    final overdue = at.difference(item.dueDate).inDays;
+    if (overdue >= fallAfterDays) return LeafLook.fallen;
+    if (overdue >= wiltAfterDays) return LeafLook.wilting;
+  }
+  return leafNeedsTraining(item, now: at) ? LeafLook.gold : LeafLook.green;
+}
+
+/// What a well-kept tree grows.
+enum TreeBloom { none, blossom, fruit }
+
+/// Blossoms once every note (at least 3) is green; fruit once they are also
+/// settled in memory (each next review three weeks or more away).
+TreeBloom treeBloom(List<KnowledgeItem> notes, {DateTime? now}) {
+  if (notes.length < 3) return TreeBloom.none;
+  if (notes.any((n) => leafLook(n, now: now) != LeafLook.green)) return TreeBloom.none;
+  return notes.every((n) => n.intervalDays >= 21) ? TreeBloom.fruit : TreeBloom.blossom;
+}
+
+/// Per note, whether its leaf lies on the ground (for tapping it there).
+List<bool> fallenLeaves(List<KnowledgeItem> notes, {DateTime? now}) =>
+    [for (final n in notes) leafLook(n, now: now) == LeafLook.fallen];
+
 /// The synthetic ungrouped bucket is shown in the interface language.
+String categoryDisplayName(BuildContext context, String category) =>
+    _displayName(context, category);
+
 String _displayName(BuildContext context, String category) =>
     category == kUngroupedCategory ? context.s.ungrouped : category;
 
 /// Notes in leaf order: oldest first, so existing leaves keep their spot as new
 /// notes sprout.
-List<KnowledgeItem> _leafOrder(List<KnowledgeItem> notes) =>
+List<KnowledgeItem> leafOrder(List<KnowledgeItem> notes) =>
     List.of(notes)..sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
 /// A category drawn as a living tree whose size and shape grow with its note
@@ -62,7 +110,7 @@ class CategoryTree extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final ordered = _leafOrder(notes);
+    final ordered = leafOrder(notes);
     final model = TreeModel.generate(count: ordered.length, seed: category);
 
     return Card(
@@ -86,6 +134,11 @@ class CategoryTree extends StatelessWidget {
                   ),
                 ),
                 Text('${notes.length}', style: theme.textTheme.labelMedium),
+                IconButton(
+                  tooltip: context.s.shareCategory,
+                  icon: const Icon(Icons.ios_share, size: 20),
+                  onPressed: () => showShareCategory(context, category, notes),
+                ),
                 IconButton(
                   tooltip: context.s.zoom,
                   icon: const Icon(Icons.zoom_out_map, size: 20),
@@ -113,7 +166,8 @@ class CategoryTree extends StatelessWidget {
                     final dx = (width - model.size.width * scale) / 2;
                     final p = (d.localPosition - Offset(dx, 0)) / scale;
                     // At small scales, widen the target to a ~14px finger.
-                    final hit = model.leafAt(p, slop: 14 / scale - 14);
+                    final hit = model.leafAt(p,
+                        slop: 14 / scale - 14, fallen: fallenLeaves(ordered));
                     if (hit != null) {
                       onLeafTap(ordered[hit]);
                     } else {
@@ -237,7 +291,8 @@ class _TreeViewerScreenState extends State<TreeViewerScreen> {
                     onTapUp: (d) {
                       final scale = _controller.value.getMaxScaleOnAxis();
                       final hit = model.leafAt(d.localPosition,
-                          slop: math.max(0, 14 / scale - 14));
+                          slop: math.max(0, 14 / scale - 14),
+                          fallen: fallenLeaves(widget.notes));
                       if (hit != null) widget.onLeafTap(widget.notes[hit]);
                     },
                     child: TreeCanvas(model: model, notes: widget.notes),
@@ -298,37 +353,120 @@ class _ZoomButton extends StatelessWidget {
   }
 }
 
-/// Paints a [TreeModel] at its natural size with one leaf per note.
-class TreeCanvas extends StatelessWidget {
-  const TreeCanvas({super.key, required this.model, required this.notes});
+/// Paints a [TreeModel] at its natural size with one leaf per note, and
+/// keeps it alive: leaves sway, a leaf turns from gold to green when its note
+/// is learned, long-overdue leaves wilt and fall, and a fully learned tree
+/// blossoms, then bears fruit. Motion stops when the system asks for reduced
+/// motion.
+class TreeCanvas extends StatefulWidget {
+  const TreeCanvas(
+      {super.key, required this.model, required this.notes, this.still = false});
 
   final TreeModel model;
   final List<KnowledgeItem> notes;
+
+  /// Drawn without motion (e.g. into an image for the home-screen widget).
+  final bool still;
+
+  @override
+  State<TreeCanvas> createState() => _TreeCanvasState();
+}
+
+class _TreeCanvasState extends State<TreeCanvas> with TickerProviderStateMixin {
+  late final AnimationController _sway =
+      AnimationController(vsync: this, duration: const Duration(seconds: 7));
+  late final AnimationController _greening =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 1600));
+
+  /// Notes whose leaf is turning green right now.
+  Set<String> _turning = {};
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final still =
+        widget.still || (MediaQuery.maybeDisableAnimationsOf(context) ?? false);
+    if (still) {
+      _sway.stop();
+    } else if (!_sway.isAnimating) {
+      _sway.repeat();
+    }
+  }
+
+  @override
+  void didUpdateWidget(TreeCanvas old) {
+    super.didUpdateWidget(old);
+    final before = {for (final n in old.notes) n.id: leafLook(n)};
+    final turned = {
+      for (final n in widget.notes)
+        if (before[n.id] != null &&
+            before[n.id] != LeafLook.green &&
+            leafLook(n) == LeafLook.green)
+          n.id,
+    };
+    if (turned.isNotEmpty) {
+      _turning = turned;
+      _greening.forward(from: 0);
+    }
+  }
+
+  @override
+  void dispose() {
+    _sway.dispose();
+    _greening.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final dark = Theme.of(context).brightness == Brightness.dark;
     final now = DateTime.now();
+    final looks = [for (final n in widget.notes) leafLook(n, now: now)];
+    final bloom = treeBloom(widget.notes, now: now);
     return RepaintBoundary(
-      child: CustomPaint(
-        size: model.size,
-        painter: _TreePainter(
-          model: model,
-          autumn: [for (final n in notes) leafNeedsTraining(n, now: now)],
-          dark: dark,
-        ),
+      child: AnimatedBuilder(
+        animation: Listenable.merge([_sway, _greening]),
+        builder: (context, _) {
+          final greening = _greening.isAnimating ? _greening.value : 1.0;
+          return CustomPaint(
+            size: widget.model.size,
+            painter: _TreePainter(
+              model: widget.model,
+              looks: looks,
+              turning: [
+                for (final n in widget.notes)
+                  _turning.contains(n.id) && greening < 1 ? greening : null,
+              ],
+              sway: _sway.value,
+              bloom: bloom,
+              dark: dark,
+            ),
+          );
+        },
       ),
     );
   }
 }
 
 class _TreePainter extends CustomPainter {
-  _TreePainter({required this.model, required this.autumn, required this.dark});
+  _TreePainter({
+    required this.model,
+    required this.looks,
+    required this.turning,
+    required this.sway,
+    required this.bloom,
+    required this.dark,
+  });
 
   final TreeModel model;
+  final List<LeafLook> looks;
 
-  /// Per leaf: true = autumn gold (needs training), false = green.
-  final List<bool> autumn;
+  /// Per leaf: progress (0–1) of turning from gold to green, or null.
+  final List<double?> turning;
+
+  /// Position in the sway cycle, 0–1.
+  final double sway;
+  final TreeBloom bloom;
   final bool dark;
 
   // Leaf palettes: [light, dark, vein/edge].
@@ -336,13 +474,106 @@ class _TreePainter extends CustomPainter {
   static const _summerAlt = [Color(0xFFA6D96A), Color(0xFF4A8F2A), Color(0xFF2E6118)];
   static const _autumn = [Color(0xFFFFE082), Color(0xFFE8A317), Color(0xFFA86A00)];
   static const _autumnAlt = [Color(0xFFFFCC66), Color(0xFFE07B12), Color(0xFF9A4E00)];
+  static const _withered = [Color(0xFFD9B48C), Color(0xFF9C6B3F), Color(0xFF6E4524)];
 
   @override
   void paint(Canvas canvas, Size size) {
     _paintGround(canvas);
     _paintBranches(canvas);
+    // Fallen leaves lie on the ground, under the canopy.
     for (var i = 0; i < model.leaves.length; i++) {
-      _paintLeaf(canvas, model.leaves[i], i < autumn.length && autumn[i]);
+      if (_look(i) == LeafLook.fallen) {
+        _paintLeaf(canvas, model.fallenSlot(i), _withered);
+      }
+    }
+    for (var i = 0; i < model.leaves.length; i++) {
+      final look = _look(i);
+      if (look == LeafLook.fallen) continue;
+      final slot = model.leaves[i];
+      final alt = slot.tint > 0.35;
+      // Each leaf sways on its own phase; wilting ones droop and barely move.
+      final phase = slot.position.dx * 0.045 + slot.tint * 2;
+      final swing = math.sin(2 * math.pi * sway + phase) *
+          (look == LeafLook.wilting ? 0.025 : 0.075);
+      var angle = slot.angle + swing;
+      if (look == LeafLook.wilting) {
+        angle += _towardsDown(angle) * 0.55;
+      }
+      final turn = i < turning.length ? turning[i] : null;
+      final palette = switch (look) {
+        LeafLook.wilting => _withered,
+        LeafLook.gold => alt ? _autumnAlt : _autumn,
+        _ when turn != null => [
+            for (var k = 0; k < 3; k++)
+              Color.lerp((alt ? _autumnAlt : _autumn)[k], (alt ? _summerAlt : _summer)[k],
+                  Curves.easeInOut.transform(turn))!,
+          ],
+        _ => alt ? _summerAlt : _summer,
+      };
+      if (turn != null) _paintGlow(canvas, slot, turn);
+      _paintLeaf(canvas, LeafSlot(slot.position, angle, slot.tint), palette);
+    }
+    if (bloom != TreeBloom.none) _paintBloom(canvas);
+  }
+
+  LeafLook _look(int i) => i < looks.length ? looks[i] : LeafLook.gold;
+
+  /// Signed turn from [angle] towards pointing straight down.
+  static double _towardsDown(double angle) {
+    var d = (math.pi / 2 - angle) % (2 * math.pi);
+    if (d > math.pi) d -= 2 * math.pi;
+    return d;
+  }
+
+  /// A soft light behind a leaf that just turned green.
+  void _paintGlow(Canvas canvas, LeafSlot slot, double t) {
+    final center = slot.position +
+        Offset(math.cos(slot.angle), math.sin(slot.angle)) * (TreeModel.leafLength * 0.5);
+    final strength = math.sin(t * math.pi);
+    canvas.drawCircle(
+      center,
+      TreeModel.leafLength * (0.8 + t * 0.6),
+      Paint()
+        ..shader = RadialGradient(colors: [
+          const Color(0xFFFFF59D).withValues(alpha: 0.75 * strength),
+          Colors.transparent,
+        ]).createShader(Rect.fromCircle(center: center, radius: TreeModel.leafLength * 1.4)),
+    );
+  }
+
+  /// Flowers (or fruit) at the tips of every other twig.
+  void _paintBloom(Canvas canvas) {
+    // Twigs are the thinnest limbs (how thin depends on the tree's size).
+    final thinnest = model.branches.map((b) => b.endWidth).reduce(math.min);
+    final twigs = [
+      for (final b in model.branches)
+        if (b.endWidth <= thinnest * 1.25) b,
+    ];
+    for (var i = 0; i < twigs.length; i += 2) {
+      final at = twigs[i].end;
+      if (bloom == TreeBloom.fruit) {
+        const r = 4.6;
+        canvas.drawLine(at, at + const Offset(0, 3),
+            Paint()..color = const Color(0xFF5D4037)..strokeWidth = 1);
+        final center = at + const Offset(0, 3 + r);
+        canvas.drawCircle(
+          center,
+          r,
+          Paint()
+            ..shader = const RadialGradient(
+              center: Alignment(-0.4, -0.4),
+              colors: [Color(0xFFFF8A80), Color(0xFFC62828)],
+            ).createShader(Rect.fromCircle(center: center, radius: r)),
+        );
+      } else {
+        const petal = 2.6;
+        final petals = Paint()..color = const Color(0xFFF8BBD0);
+        for (var k = 0; k < 5; k++) {
+          final a = k * 2 * math.pi / 5 + i;
+          canvas.drawCircle(at + Offset(math.cos(a), math.sin(a)) * petal, petal, petals);
+        }
+        canvas.drawCircle(at, 1.6, Paint()..color = const Color(0xFFFFD54F));
+      }
     }
   }
 
@@ -428,13 +659,8 @@ class _TreePainter extends CustomPainter {
     return path..close();
   }
 
-  void _paintLeaf(Canvas canvas, LeafSlot leaf, bool isAutumn) {
+  void _paintLeaf(Canvas canvas, LeafSlot leaf, List<Color> palette) {
     const len = TreeModel.leafLength;
-    // Alternate shade for some leaves so the crown has depth.
-    final alt = leaf.tint > 0.35;
-    final palette = isAutumn
-        ? (alt ? _autumnAlt : _autumn)
-        : (alt ? _summerAlt : _summer);
     final scale = 0.85 + (leaf.tint.abs() * 0.3);
 
     canvas.save();
@@ -487,14 +713,5 @@ class _TreePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _TreePainter old) =>
-      old.model != model || old.dark != dark || !_sameList(old.autumn, autumn);
-
-  static bool _sameList(List<bool> a, List<bool> b) {
-    if (a.length != b.length) return false;
-    for (var i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) return false;
-    }
-    return true;
-  }
+  bool shouldRepaint(covariant _TreePainter old) => true;
 }

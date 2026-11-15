@@ -63,36 +63,16 @@ class _DataSectionState extends ConsumerState<DataSection> {
       });
 
   Future<void> _restore() => _run(() async {
-        final strings = context.s;
         final picked = await pickFile('Bilig', const ['bilig', 'json']);
-        if (picked == null) return;
-        final file = BiligFile.decode(picked.$2);
-        final result =
-            await ref.read(knowledgeListProvider.notifier).importFile(file);
-        _say(strings.imported(result.added, result.updated));
+        if (picked == null || !mounted) return;
+        await openNotesFile(context, ref, picked.$1, picked.$2);
       });
 
   Future<void> _importOther() => _run(() async {
-        final strings = context.s;
-        final navigator = Navigator.of(context);
         final picked = await pickFile(
             'Anki / Quizlet', const ['apkg', 'colpkg', 'txt', 'csv', 'tsv']);
-        if (picked == null) return;
-        final (name, bytes) = picked;
-        final lower = name.toLowerCase();
-        final List<NoteDraft> drafts;
-        if (lower.endsWith('.apkg') || lower.endsWith('.colpkg')) {
-          drafts = await compute(importAnkiPackage, bytes);
-        } else {
-          drafts = importDelimitedText(_decodeText(bytes));
-        }
-        if (drafts.isEmpty) {
-          _say(strings.nothingToImport);
-          return;
-        }
-        await navigator.push(MaterialPageRoute(
-          builder: (_) => BulkAddScreen(source: BulkSource.import, initialDrafts: drafts),
-        ));
+        if (picked == null || !mounted) return;
+        await openNotesFile(context, ref, picked.$1, picked.$2);
       });
 
   Future<void> _removeSamples() => _run(() async {
@@ -158,5 +138,60 @@ String _decodeText(Uint8List bytes) {
     return text.startsWith('\uFEFF') ? text.substring(1) : text;
   } on FormatException {
     return latin1.decode(bytes);
+  }
+}
+
+/// Opens a notes file by its kind: a .bilig backup or shared category is
+/// merged in (after asking, for a shared one); an Anki deck or exported text
+/// goes to the import screen to pick notes. Used by Settings and by files
+/// shared into the app.
+Future<void> openNotesFile(
+    BuildContext context, WidgetRef ref, String name, Uint8List bytes) async {
+  final strings = context.s;
+  final messenger = ScaffoldMessenger.of(context);
+  final navigator = Navigator.of(context);
+  final lower = name.toLowerCase();
+  try {
+    if (lower.endsWith('.apkg') ||
+        lower.endsWith('.colpkg') ||
+        lower.endsWith('.txt') ||
+        lower.endsWith('.csv') ||
+        lower.endsWith('.tsv')) {
+      final List<NoteDraft> drafts = lower.endsWith('pkg')
+          ? await compute(importAnkiPackage, bytes)
+          : importDelimitedText(_decodeText(bytes));
+      if (drafts.isEmpty) {
+        messenger.showSnackBar(SnackBar(content: Text(strings.nothingToImport)));
+        return;
+      }
+      await navigator.push(MaterialPageRoute(
+        builder: (_) => BulkAddScreen(source: BulkSource.import, initialDrafts: drafts),
+      ));
+      return;
+    }
+    final file = BiligFile.decode(bytes);
+    if (file.kind == BiligFileKind.share && context.mounted) {
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(strings.addSharedTitle(file.title ?? name)),
+          content: Text(strings.addSharedBody(file.notes.length)),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text(strings.cancel)),
+            FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: Text(strings.addNotes)),
+          ],
+        ),
+      );
+      if (ok != true) return;
+    }
+    final result = await ref.read(knowledgeListProvider.notifier).importFile(file);
+    messenger.showSnackBar(
+        SnackBar(content: Text(strings.imported(result.added, result.updated))));
+  } catch (e) {
+    messenger.showSnackBar(SnackBar(content: Text(strings.fileFailed(e))));
   }
 }

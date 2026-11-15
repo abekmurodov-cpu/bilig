@@ -3,6 +3,7 @@ package com.arximed.knowledge
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
+import android.provider.OpenableColumns
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -46,22 +47,27 @@ class MainActivity : FlutterActivity() {
             val joined = if (subject != null && !text.contains(subject)) "$subject\n$text" else text
             return mapOf("text" to joined)
         }
-        if (type.startsWith("image/")) {
-            val uri: Uri? = if (Build.VERSION.SDK_INT >= 33) {
-                intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
-            } else {
-                @Suppress("DEPRECATION")
-                intent.getParcelableExtra(Intent.EXTRA_STREAM)
-            }
-            val bytes = uri?.let {
-                try {
-                    contentResolver.openInputStream(it)?.use { s -> s.readBytes() }
-                } catch (e: Exception) {
-                    null
-                }
-            } ?: return null
-            return mapOf("image" to bytes)
+        val uri: Uri? = if (Build.VERSION.SDK_INT >= 33) {
+            intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra(Intent.EXTRA_STREAM)
         }
-        return null
+        val bytes = uri?.let {
+            try {
+                contentResolver.openInputStream(it)?.use { s -> s.readBytes() }
+            } catch (e: Exception) {
+                null
+            }
+        } ?: return null
+        if (type.startsWith("image/")) return mapOf("image" to bytes)
+        // Any other file: a .bilig shared by a classmate, an Anki deck…
+        return mapOf("file" to bytes, "name" to displayName(uri))
+    }
+
+    private fun displayName(uri: Uri): String {
+        contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)
+            ?.use { c -> if (c.moveToFirst()) return c.getString(0) ?: "" }
+        return uri.lastPathSegment ?: ""
     }
 }

@@ -11,6 +11,19 @@ class MainFlutterWindow: NSWindow {
     RegisterGeneratedPlugins(registry: flutterViewController)
     ShareBridge.shared.attach(to: flutterViewController)
 
+    // How many notes are due, as a badge on the Dock icon.
+    FlutterMethodChannel(
+      name: "bilig/badge", binaryMessenger: flutterViewController.engine.binaryMessenger
+    ).setMethodCallHandler { call, result in
+      guard call.method == "set" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      let count = call.arguments as? Int ?? 0
+      NSApp.dockTile.badgeLabel = count > 0 ? "\(count)" : nil
+      result(nil)
+    }
+
     super.awakeFromNib()
   }
 }

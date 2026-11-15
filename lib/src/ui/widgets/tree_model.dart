@@ -130,12 +130,26 @@ class TreeModel {
     );
   }
 
-  /// Index of the leaf under [point] (tree coordinates), or null.
-  int? leafAt(Offset point, {double slop = 0}) {
+  /// Where leaf [i] lies once it has fallen: scattered on the ground under
+  /// the tree, the same spot every time.
+  LeafSlot fallenSlot(int i) {
+    final base = branches.first.start;
+    final rng = math.Random(i * 7919 + 17);
+    final reach = trunkWidth * 2.5 + 26;
+    return LeafSlot(
+      base + Offset((rng.nextDouble() * 2 - 1) * reach, 1 + rng.nextDouble() * 4),
+      (rng.nextBool() ? 0.0 : math.pi) + (rng.nextDouble() - 0.5) * 0.6,
+      leaves[i].tint,
+    );
+  }
+
+  /// Index of the leaf under [point] (tree coordinates), or null. Leaves
+  /// marked in [fallen] are looked for on the ground.
+  int? leafAt(Offset point, {double slop = 0, List<bool> fallen = const []}) {
     int? best;
     var bestDist = leafLength * 0.75 + slop;
     for (var i = 0; i < leaves.length; i++) {
-      final l = leaves[i];
+      final l = i < fallen.length && fallen[i] ? fallenSlot(i) : leaves[i];
       // Test against the leaf blade's center, not its stem.
       final center = l.position +
           Offset(math.cos(l.angle), math.sin(l.angle)) * (leafLength * 0.5);
