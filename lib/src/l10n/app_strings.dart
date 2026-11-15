@@ -332,6 +332,40 @@ class AppStrings {
         'Заполните пропуск в уме, затем откройте ответ и оцените себя.',
       );
 
+  // --- Reviewing better ----------------------------------------------------
+  String get partlyRight => _t('Partly right', 'Qisman to‘g‘ri', 'Частично верно');
+  String get allCaughtUp => _t('All caught up', 'Hammasi takrorlangan', 'Всё повторено');
+  String get practiseAhead => _t('Nothing due. Quick 5 practises what’s coming next.',
+      'Takrorlash yo‘q. «Tezkor 5» keyingi qaydlarni mashq qildiradi.',
+      'Повторять нечего. «Быстрые 5» потренируют то, что на очереди.');
+  String dueToday(int n) => _t('$n due', '$n ta takrorlash', 'К повторению: $n');
+  String aboutMinutes(int n) =>
+      _t('about $n min', 'taxminan $n daqiqa', 'примерно $n мин');
+  String get quickFive => _t('Quick 5', 'Tezkor 5', 'Быстрые 5');
+  String examIn(String category, int days) => switch (days) {
+        0 => _t('$category exam today', '$category imtihoni bugun',
+            'Экзамен по $category сегодня'),
+        1 => _t('$category exam tomorrow', '$category imtihoni ertaga',
+            'Экзамен по $category завтра'),
+        _ => _t('$category exam in $days days', '$category imtihoniga $days kun',
+            'Экзамен по $category через $days ${_ruPlural(days, 'день', 'дня', 'дней')}'),
+      };
+  String examReady(int ready, int total) => _t('$ready of $total notes known',
+      '$total ta qayddan $ready tasi o‘zlashtirilgan', 'Выучено $ready из $total');
+  String get study => _t('Study', 'O‘qish', 'Учить');
+  String get examMode => _t('Exam date', 'Imtihon sanasi', 'Дата экзамена');
+  String get examBlurb => _t(
+        'Until the exam, this category’s reviews come a bit sooner and always before the day, so everything gets a last look.',
+        'Imtihongacha bu turkum takrorlari biroz tezroq va doim imtihondan oldin keladi, shunda hammasi oxirgi marta ko‘rib chiqiladi.',
+        'До экзамена повторения этой категории приходят чуть чаще и всегда до его дня, чтобы всё успеть освежить.',
+      );
+  String get pickExamDate => _t('Pick the date', 'Sanani tanlang', 'Выберите дату');
+  String get removeExam => _t('Remove exam', 'Imtihonni olib tashlash', 'Убрать экзамен');
+  String get examNeedsCategory => _t('Give your notes a category first.',
+      'Avval qaydlaringizga turkum bering.', 'Сначала задайте заметкам категорию.');
+  String get whyWrong =>
+      _t('Why was I wrong?', 'Nega xato qildim?', 'Почему я ошибся?');
+
   // --- Faster capture: photo, paste & split, voice, sharing -------------
   String get photoToNotes => _t('Photo → notes', 'Rasmdan qaydlar', 'Фото → заметки');
   String get pasteAndSplit =>

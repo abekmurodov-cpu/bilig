@@ -4,9 +4,13 @@ import '../models/knowledge_item.dart';
 
 /// Result of grading a free-typed answer with an LLM.
 class LlmGrade {
-  const LlmGrade({required this.correct, this.feedback});
+  const LlmGrade({required this.correct, this.partial = false, this.feedback});
 
+  /// Right in substance (a [partial] answer counts as correct, but weaker).
   final bool correct;
+
+  /// Got the main idea but missed or garbled part of it.
+  final bool partial;
   final String? feedback;
 }
 
@@ -138,6 +142,11 @@ abstract class LlmProvider {
 
   /// Suggests a short category/tag for a freshly captured note.
   Future<String> suggestCategory(String front, String? back);
+
+  /// After a wrong answer: why the right answer is right (and the student's
+  /// isn't), plus a short memory trick. 2-3 short lines.
+  Future<String> explainMistake(KnowledgeItem item,
+      {required String question, required String answer, String? studentAnswer});
 
   /// Whether this AI can read photos (most current models can).
   bool get canReadImages;

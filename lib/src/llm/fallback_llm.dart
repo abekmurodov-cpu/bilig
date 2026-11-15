@@ -53,6 +53,14 @@ class FallbackLlm implements LlmProvider {
   String get displayName => primary.displayName;
 
   @override
+  Future<String> explainMistake(KnowledgeItem item,
+          {required String question,
+          required String answer,
+          String? studentAnswer}) =>
+      _run((l) => l.explainMistake(item,
+          question: question, answer: answer, studentAnswer: studentAnswer));
+
+  @override
   bool get canReadImages => primary.canReadImages || backup.canReadImages;
 
   @override

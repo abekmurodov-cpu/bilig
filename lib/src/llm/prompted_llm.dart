@@ -263,15 +263,41 @@ abstract class PromptedLlm implements LlmProvider {
   @override
   Future<LlmGrade> gradeAnswer(KnowledgeItem item, String answer) async {
     final raw = await complete(
-      'Grade a student\'s answer to a flashcard. Decide if it is essentially '
-      'correct (meaning matches, ignore wording/typos/language). '
-      'Return JSON: {"correct": true|false, "feedback": "one short sentence"}.\n\n'
+      'Grade a student\'s answer to a flashcard, written from memory. Judge '
+      'the meaning, not the wording (ignore typos, synonyms and language).\n'
+      '- "correct": it has the key idea of the expected answer.\n'
+      '- "partial": it has part of the key idea but misses or garbles '
+      'something important.\n'
+      '- "wrong": it misses the key idea or contradicts it.\n'
+      'Return JSON: {"verdict": "correct"|"partial"|"wrong", "feedback": '
+      '"one short sentence; for partial or wrong, say what was missing"}. '
+      'Write the feedback in the language of the question.\n\n'
       'Question: ${item.practicePrompt}\n'
       'Expected answer: ${_clip(item.activeQuiz?.answer ?? item.back ?? '')}\n'
       'Student answer: $answer',
       json: true,
     );
     return _parseGrade(raw);
+  }
+
+  @override
+  Future<String> explainMistake(KnowledgeItem item,
+      {required String question,
+      required String answer,
+      String? studentAnswer}) async {
+    final text = await complete(
+      'A student got a flashcard wrong. Help them remember it next time. '
+      'In at most 2 short sentences explain why the correct answer is right'
+      '${studentAnswer == null ? '' : ' and why their answer is not'}. Then, '
+      'on a new line starting with "💡 ", give one short memory trick '
+      '(a mnemonic, an image or a link to something familiar). Write in the '
+      'language of the question. No preamble, no markdown.\n\n'
+      'Question: ${_clip(question)}\n'
+      'Correct answer: ${_clip(answer)}\n'
+      '${studentAnswer == null ? '' : 'Student answered: ${_clip(studentAnswer)}\n'}'
+      '${item.hasAnswer ? 'Note: ${_clip(item.back!)}' : ''}',
+    );
+    return text.trim();
   }
 
   @override
@@ -302,6 +328,15 @@ abstract class PromptedLlm implements LlmProvider {
 
   static LlmGrade _parseGrade(String raw) {
     final decoded = decodeJsonLoose(raw);
+    final verdict =
+        decoded is Map ? '${decoded['verdict'] ?? ''}'.trim().toLowerCase() : '';
+    if (decoded is Map && const ['correct', 'partial', 'wrong'].contains(verdict)) {
+      return LlmGrade(
+        correct: verdict != 'wrong',
+        partial: verdict == 'partial',
+        feedback: decoded['feedback'] as String?,
+      );
+    }
     if (decoded is Map && decoded['correct'] is bool) {
       return LlmGrade(
         correct: decoded['correct'] as bool,

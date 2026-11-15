@@ -76,6 +76,13 @@ class _PracticeSessionScreenState
   // Shared "answered" result for objective modes.
   bool? _wasCorrect;
   String? _feedback;
+
+  /// The AI judged a typed answer partly right (counted, but as "hard").
+  bool _partial = false;
+
+  /// The AI's "why was I wrong?" explanation for the card on screen.
+  String? _why;
+  bool _explaining = false;
   bool _grading = false;
 
   /// How long practice waits for AI questions before starting anyway.
@@ -377,15 +384,19 @@ class _PracticeSessionScreenState
     if (_index < _queue.length) _prepareItem();
   }
 
-  Future<void> _submitObjective(bool correct, {String? feedback}) async {
+  Future<void> _submitObjective(bool correct,
+      {String? feedback, bool partial = false}) async {
     setState(() {
       _wasCorrect = correct;
       _feedback = feedback;
+      _partial = correct && partial;
     });
     // Persist the outcome via the scheduler.
     await ref.read(knowledgeListProvider.notifier).grade(
           _item,
-          correct ? ReviewGrade.good : ReviewGrade.again,
+          !correct
+              ? ReviewGrade.again
+              : (_partial ? ReviewGrade.hard : ReviewGrade.good),
         );
     if (correct) _correctCount++;
   }
@@ -403,6 +414,9 @@ class _PracticeSessionScreenState
       _correctOption = null;
       _wasCorrect = null;
       _feedback = null;
+      _partial = false;
+      _why = null;
+      _explaining = false;
       _reorderCurrent = [];
       _answerController.clear();
       _codeController.clear();
@@ -726,6 +740,7 @@ class _PracticeSessionScreenState
                                 _submitObjective(option == _correctOption);
                               },
                       ),
+                    if (answered) _whyBox(),
                   ],
                 ),
         ),
@@ -760,6 +775,7 @@ class _PracticeSessionScreenState
                   ),
                 ),
                 if (answered) _resultBanner(),
+                if (answered) _whyBox(),
               ],
             ),
           ),
@@ -809,11 +825,13 @@ class _PracticeSessionScreenState
     final aiAttached = !_isCloze && ref.read(llmProvider) != null;
     setState(() => _grading = true);
     bool correct;
+    var partial = false;
     String? feedback;
     if (llm != null) {
       try {
         final grade = await llm.gradeAnswer(_item, guess);
         correct = grade.correct;
+        partial = grade.partial;
         feedback = grade.feedback;
       } catch (e) {
         if (e is LlmException) {
@@ -828,12 +846,84 @@ class _PracticeSessionScreenState
     }
     if (!mounted) return;
     setState(() => _grading = false);
-    await _submitObjective(correct, feedback: feedback);
+    await _submitObjective(correct, feedback: feedback, partial: partial);
+  }
+
+  /// Whether "Why was I wrong?" can be offered for the card on screen.
+  bool get _canExplain =>
+      _wasCorrect == false &&
+      !widget.config.method.isCoding &&
+      ref.read(llmProvider) != null &&
+      (_revealAnswer ?? _correctOption) != null;
+
+  Future<void> _explain() async {
+    final strings = context.s;
+    final llm = ref.read(llmProvider);
+    if (llm == null) return;
+    final typed = _answerController.text.trim();
+    setState(() => _explaining = true);
+    String text;
+    try {
+      text = await llm.explainMistake(
+        _item,
+        question: _prompt,
+        answer: _correctOption ?? _revealAnswer ?? '',
+        studentAnswer: _chosen ?? (typed.isEmpty ? null : typed),
+      );
+    } on LlmException catch (e) {
+      if (mounted) ref.read(quizPrepProvider.notifier).reportError(e);
+      text = strings.aiFailure(e.kind, e.message);
+    } catch (e) {
+      text = strings.couldNotGenerate(e);
+    }
+    if (mounted) {
+      setState(() {
+        _explaining = false;
+        _why = text;
+      });
+    }
+  }
+
+  /// The "Why was I wrong?" button, then the AI's explanation.
+  Widget _whyBox() {
+    final theme = Theme.of(context);
+    final why = _why;
+    if (why != null) {
+      return Container(
+        width: double.infinity,
+        margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(why, style: theme.textTheme.bodyMedium),
+      );
+    }
+    if (!_canExplain) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: Align(
+        alignment: Alignment.centerLeft,
+        child: TextButton.icon(
+          onPressed: _explaining ? null : _explain,
+          icon: _explaining
+              ? const SizedBox(
+                  width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.lightbulb_outline),
+          label: Text(context.s.whyWrong),
+        ),
+      ),
+    );
   }
 
   Widget _resultBanner() {
     final correct = _wasCorrect == true;
-    final color = correct ? const Color(0xFF2E9E4F) : const Color(0xFFD64545);
+    final color = _partial
+        ? const Color(0xFFC98A00)
+        : correct
+            ? const Color(0xFF2E9E4F)
+            : const Color(0xFFD64545);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Container(
@@ -849,9 +939,16 @@ class _PracticeSessionScreenState
           children: [
             Row(
               children: [
-                Icon(correct ? Icons.check_circle : Icons.cancel, color: color),
+                Icon(
+                    _partial
+                        ? Icons.adjust
+                        : (correct ? Icons.check_circle : Icons.cancel),
+                    color: color),
                 const SizedBox(width: 8),
-                Text(correct ? context.s.correct : context.s.incorrect,
+                Text(
+                    _partial
+                        ? context.s.partlyRight
+                        : (correct ? context.s.correct : context.s.incorrect),
                     style: TextStyle(
                         color: color, fontWeight: FontWeight.bold)),
               ],
@@ -936,6 +1033,7 @@ class _PracticeSessionScreenState
     final llm = _gradingLlm;
     setState(() => _grading = true);
     bool correct;
+    var partial = false;
     String? feedback;
     if (llm != null) {
       try {
@@ -960,7 +1058,7 @@ class _PracticeSessionScreenState
     }
     if (!mounted) return;
     setState(() => _grading = false);
-    await _submitObjective(correct, feedback: feedback);
+    await _submitObjective(correct, feedback: feedback, partial: partial);
   }
 
   // --- Fill in the blank (inline tap-to-type) -----------------------------

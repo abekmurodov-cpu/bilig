@@ -10,6 +10,7 @@ import '../models/highlights.dart';
 import '../models/knowledge_item.dart';
 import '../practice/code_drills.dart';
 import '../scheduler/spaced_repetition.dart';
+import 'study_providers.dart';
 
 /// Bound to the concrete repository in `main` via a ProviderScope override.
 final knowledgeRepositoryProvider = Provider<KnowledgeRepository>((ref) {
@@ -134,10 +135,37 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
     await _refresh();
   }
 
-  /// Records a review outcome, reschedules the item, and persists it.
+  /// Records a review outcome, reschedules the item (around its category's
+  /// exam, if one is coming), counts it for the day, and persists it.
   Future<void> grade(KnowledgeItem item, ReviewGrade grade) async {
-    final updated = ref.read(_schedulerProvider).schedule(item, grade);
+    final exam = ref.read(examsProvider.notifier).upcoming(item.category);
+    final updated =
+        ref.read(_schedulerProvider).schedule(item, grade, examDate: exam);
     await _repo.save(updated);
+    await ref
+        .read(activityProvider.notifier)
+        .record(correct: grade != ReviewGrade.again);
+    await _refresh();
+  }
+
+  /// Takes back a grade: restores [before] (the note as it was) and
+  /// uncounts the review.
+  Future<void> undoGrade(KnowledgeItem before, ReviewGrade grade) async {
+    // Only the review is undone; anything else that changed on the note
+    // since (e.g. questions written meanwhile) stays.
+    final current = [
+      for (final i in state.asData?.value ?? const <KnowledgeItem>[])
+        if (i.id == before.id) i,
+    ].firstOrNull ?? before;
+    final old = before.toMap();
+    await _repo.save(KnowledgeItem.fromMap({
+      ...current.toMap(),
+      for (final k in KnowledgeItem.reviewFields) k: old[k],
+      'updatedAt': DateTime.now().toIso8601String(),
+    }));
+    await ref
+        .read(activityProvider.notifier)
+        .record(correct: grade != ReviewGrade.again, undo: true);
     await _refresh();
   }
 

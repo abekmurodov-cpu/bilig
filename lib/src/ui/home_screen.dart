@@ -4,9 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../l10n/app_strings.dart';
 import '../providers/knowledge_providers.dart';
 import 'capture_screen.dart';
-import 'review_screen.dart';
 import 'widgets/app_logo.dart';
 import 'widgets/item_tile.dart';
+import 'widgets/study_cards.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -14,7 +14,7 @@ class HomeScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final itemsAsync = ref.watch(knowledgeListProvider);
-    final dueCount = ref.watch(dueItemsProvider).length;
+    final items = itemsAsync.asData?.value ?? const [];
 
     return Scaffold(
       appBar: AppBar(
@@ -25,6 +25,14 @@ class HomeScreen extends ConsumerWidget {
             Text('Bilig'),
           ],
         ),
+        actions: [
+          if (items.isNotEmpty)
+            IconButton(
+              tooltip: context.s.examMode,
+              icon: const Icon(Icons.event_outlined),
+              onPressed: () => showExamDialog(context, ref),
+            ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _openCapture(context),
@@ -40,11 +48,8 @@ class HomeScreen extends ConsumerWidget {
           }
           return Column(
             children: [
-              if (dueCount > 0)
-                _ReviewBanner(
-                  count: dueCount,
-                  onStart: () => _openReview(context),
-                ),
+              const TodayCard(),
+              const ExamCards(),
               Expanded(
                 child: ListView.separated(
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
@@ -63,48 +68,6 @@ class HomeScreen extends ConsumerWidget {
   void _openCapture(BuildContext context) {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => const CaptureScreen()),
-    );
-  }
-
-  void _openReview(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ReviewScreen()),
-    );
-  }
-}
-
-class _ReviewBanner extends StatelessWidget {
-  const _ReviewBanner({required this.count, required this.onStart});
-
-  final int count;
-  final VoidCallback onStart;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: scheme.primaryContainer,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.bolt, color: scheme.onPrimaryContainer),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              context.s.readyToChallenge(count),
-              style: TextStyle(
-                color: scheme.onPrimaryContainer,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          FilledButton(onPressed: onStart, child: Text(context.s.review)),
-        ],
-      ),
     );
   }
 }

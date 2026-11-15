@@ -59,7 +59,8 @@ void main() {
       final graded = scheduler.schedule(freshItem(), ReviewGrade.good, now: now);
 
       expect(graded.repetitions, 1);
-      expect(graded.intervalDays, 1);
+      // FSRS: a new note answered "good" is remembered ~3 days.
+      expect(graded.intervalDays, 3);
       expect(graded.dueDate.isAfter(now), isTrue);
     });
 

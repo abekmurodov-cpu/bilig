@@ -89,6 +89,8 @@ class KnowledgeItem {
     this.badQuestions = const [],
     this.quizManual = false,
     this.highlights = const [],
+    this.stability,
+    this.difficulty,
   }) : updatedAt = updatedAt ?? createdAt;
 
   final String id;
@@ -104,6 +106,11 @@ class KnowledgeItem {
   final int repetitions;
   final double easeFactor;
   final int intervalDays;
+
+  /// FSRS memory state: days until recall odds fall to 90%, and how hard
+  /// the note is (1–10). Null until the first FSRS review.
+  final double? stability;
+  final double? difficulty;
 
   // --- Sync + review-history state ---
   /// Last local mutation time; drives last-write-wins during Telegram sync.
@@ -156,6 +163,12 @@ class KnowledgeItem {
 
   /// Most highlights per note: marking everything marks nothing.
   static const int maxHighlights = 10;
+
+  /// The map keys a review changes (see SpacedRepetition.schedule).
+  static const reviewFields = [
+    'dueDate', 'lastReviewedAt', 'repetitions', 'easeFactor', 'intervalDays',
+    'lastCorrect', 'lapses', 'stability', 'difficulty',
+  ];
 
   /// Most questions kept per note.
   static const int maxQuizzes = 8;
@@ -324,6 +337,8 @@ class KnowledgeItem {
     List<QuizVariant>? extraQuizzes,
     List<String>? badQuestions,
     List<String>? highlights,
+    double? stability,
+    double? difficulty,
   }) {
     return KnowledgeItem(
       id: id,
@@ -351,6 +366,8 @@ class KnowledgeItem {
       badQuestions: badQuestions ?? this.badQuestions,
       quizManual: quizManual,
       highlights: highlights ?? this.highlights,
+      stability: stability ?? this.stability,
+      difficulty: difficulty ?? this.difficulty,
     );
   }
 
@@ -380,6 +397,8 @@ class KnowledgeItem {
         'badQuestions': badQuestions,
         if (quizManual) 'quizManual': true,
         'highlights': highlights,
+        'stability': stability,
+        'difficulty': difficulty,
       };
 
   factory KnowledgeItem.fromMap(Map<String, dynamic> map) => KnowledgeItem(
@@ -425,6 +444,8 @@ class KnowledgeItem {
             (map['badQuestions'] as List?)?.map((e) => e.toString()).toList() ??
                 const [],
         quizManual: map['quizManual'] == true,
+        stability: (map['stability'] as num?)?.toDouble(),
+        difficulty: (map['difficulty'] as num?)?.toDouble(),
         highlights:
             (map['highlights'] as List?)?.map((e) => e.toString()).toList() ??
                 const [],

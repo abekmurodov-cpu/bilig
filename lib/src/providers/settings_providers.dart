@@ -5,14 +5,12 @@ import '../data/secret_store.dart';
 import '../data/settings_repository.dart';
 import '../l10n/app_strings.dart';
 
-/// Bound to the concrete repository in `main` via a ProviderScope override,
-/// mirroring [knowledgeRepositoryProvider].
 /// Bound to the real secure store in `main`; in-memory otherwise (tests).
 final secretStoreProvider = Provider<SecretStore>((ref) => SecretStore.memory());
 
-final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
-  throw UnimplementedError('settingsRepositoryProvider must be overridden');
-});
+/// Bound to the Hive-backed store in `main`; in-memory otherwise (tests).
+final settingsRepositoryProvider =
+    Provider<SettingsRepository>((ref) => SettingsRepository.memory());
 
 /// Current theme mode, persisted in the settings box.
 class ThemeModeNotifier extends Notifier<ThemeMode> {

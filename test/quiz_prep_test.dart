@@ -57,6 +57,12 @@ class FakeLlm implements LlmProvider {
   Future<List<String>> suggestHighlights(KnowledgeItem item) =>
       throw UnimplementedError();
   @override
+  Future<String> explainMistake(KnowledgeItem item,
+          {required String question,
+          required String answer,
+          String? studentAnswer}) =>
+      throw UnimplementedError();
+  @override
   bool get canReadImages => false;
   @override
   bool get canTranscribe => false;
