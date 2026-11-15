@@ -66,6 +66,17 @@ abstract class PromptedLlm implements LlmProvider {
       notes.writeln('[${i + 1}] (${item.type.label.toLowerCase()}) '
           '${_clip(item.front)}');
       if (item.hasAnswer) notes.writeln('    Detail: ${_clip(item.back!)}');
+      if (item.highlights.isNotEmpty) {
+        notes.writeln('    Key ideas the student highlighted: '
+            '${item.highlights.map(_clip).join(' | ')}');
+      }
+      final existing = [
+        for (final v in item.quizVariants) v.question ?? item.front,
+      ];
+      if (existing.isNotEmpty) {
+        notes.writeln('    It already has these questions; write different '
+            'ones: ${existing.map(_clip).join(' | ')}');
+      }
       if (item.badQuestions.isNotEmpty) {
         notes.writeln('    The student flagged these earlier attempts as bad; '
             'do not repeat them: ${item.badQuestions.map(_clip).join(' | ')}');
@@ -77,7 +88,8 @@ abstract class PromptedLlm implements LlmProvider {
             'DIFFERENT angle (e.g. the term from its definition, the '
             'definition from the term, a key detail, a consequence or use), '
             'so the student can\'t just memorize one wording. For a note that '
-            'is already a question, give 1 variant.\n';
+            'is already a question, give 1 variant, unless it already has '
+            'questions listed — then rephrase or approach it differently.\n';
     return 'You write quiz items for a spaced-repetition study app. '
         'For EACH note below, write multiple-choice questions.\n'
         'Return JSON only, in this shape:\n'
@@ -101,6 +113,10 @@ abstract class PromptedLlm implements LlmProvider {
         'answers, each distinct from the answer and from each other, in the '
         'same style and of similar length as the answer, so the length does '
         'not give the answer away.\n'
+        '- When a note lists key ideas the student highlighted, build its '
+        'questions around them: cover different highlighted ideas first, and '
+        'test what each means, does or relates to in the note — a highlighted '
+        'term can be the answer, but don\'t just ask to repeat it.\n'
         '- Write each item in the same language as its note.\n\n'
         'Notes:\n$notes';
   }

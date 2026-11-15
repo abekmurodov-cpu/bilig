@@ -320,6 +320,84 @@ class AppStrings {
       );
   String get answerNotCounted => _t('Your answer to it doesn’t count.',
       'Unga bergan javobingiz hisobga olinmaydi.', 'Ваш ответ на него не засчитан.');
+  String get ownQuestionSelfCheck => _t(
+        'Your own question has no wrong options. Reveal the answer and grade yourself.',
+        'O‘z savolingizda noto‘g‘ri variantlar yo‘q. Javobni oching va o‘zingizni baholang.',
+        'У вашего вопроса нет неверных вариантов. Откройте ответ и оцените себя.',
+      );
+
+  // --- Note questions & highlights ---------------------------------------
+  String questionsTitle(int n) =>
+      _t('Questions ($n)', 'Savollar ($n)', 'Вопросы ($n)');
+  String get noQuestionsYet => _t('No questions yet.', 'Hali savollar yo‘q.',
+      'Вопросов пока нет.');
+  String get aiWillWrite => _t(
+        'The AI will write questions for this note shortly.',
+        'AI bu qayd uchun tez orada savollar yozadi.',
+        'ИИ скоро напишет вопросы к этой заметке.',
+      );
+  String get connectAiToGenerate => _t(
+        'Connect an AI in Settings to write questions automatically.',
+        'Savollarni avtomatik yozish uchun Sozlamalarda AI ulang.',
+        'Подключите ИИ в настройках, чтобы вопросы писались автоматически.',
+      );
+  String get addOneQuestion => _t('1 question', '1 ta savol', '1 вопрос');
+  String get addThreeQuestions => _t('3 questions', '3 ta savol', '3 вопроса');
+  String get writeOwn => _t('Write my own', 'O‘zim yozaman', 'Написать свой');
+  String get rewriteWithAi =>
+      _t('Rewrite with AI', 'AI bilan qayta yozish', 'Переписать с ИИ');
+  String get askedNext => _t('Asked next', 'Keyingi', 'Следующий');
+  String get yourQuestion => _t('Yours', 'Sizniki', 'Ваш');
+  String get questionField => _t('Question', 'Savol', 'Вопрос');
+  String get correctAnswerField =>
+      _t('Correct answer', 'To‘g‘ri javob', 'Правильный ответ');
+  String get wrongOptionsField => _t('Wrong options (one per line)',
+      'Noto‘g‘ri variantlar (har biri yangi qatorda)',
+      'Неверные варианты (по одному в строке)');
+  String get wrongOptionsHint => _t(
+        'Optional. Without them the question is a self-check in multiple choice.',
+        'Ixtiyoriy. Ularsiz test rejimida savol o‘z-o‘zini tekshirishga aylanadi.',
+        'Необязательно. Без них в режиме теста вопрос станет самопроверкой.',
+      );
+  String questionsAdded(int n) => _t(
+        n == 1 ? 'Added 1 question.' : 'Added $n questions.',
+        '$n ta savol qo‘shildi.',
+        'Добавлено: $n ${_ruPlural(n, 'вопрос', 'вопроса', 'вопросов')}.',
+      );
+  String get noNewQuestion => _t(
+        'The AI didn’t come up with a new question. Try again.',
+        'AI yangi savol topa olmadi. Yana urinib ko‘ring.',
+        'ИИ не придумал нового вопроса. Попробуйте ещё раз.',
+      );
+  String get questionRemoved => _t('Question removed. The AI won’t write it again.',
+      'Savol o‘chirildi. AI uni qayta yozmaydi.',
+      'Вопрос удалён. ИИ больше его не напишет.');
+  String get questionLimit => _t(
+        'A note keeps at most ${KnowledgeItem.maxQuizzes} questions.',
+        'Bitta qaydda ko‘pi bilan ${KnowledgeItem.maxQuizzes} ta savol bo‘ladi.',
+        'В заметке может быть не больше ${KnowledgeItem.maxQuizzes} вопросов.',
+      );
+  String get marker => _t('Mark key ideas', 'Asosiy fikrlarni belgilash',
+      'Отметить главное');
+  String get markerHint => _t(
+        'Tap the key words and ideas. Questions will focus on them.',
+        'Asosiy so‘z va fikrlarni bosing. Savollar ularga qaratiladi.',
+        'Нажимайте на главные слова и идеи. Вопросы будут о них.',
+      );
+  String get highlight => _t('Highlight', 'Belgilash', 'Выделить');
+  String get removeHighlight =>
+      _t('Remove highlight', 'Belgini olib tashlash', 'Снять выделение');
+  String get tooManyHighlights => _t(
+        'Mark only the key ideas: up to ${KnowledgeItem.maxHighlights} per note.',
+        'Faqat asosiy fikrlarni belgilang: qaydga ${KnowledgeItem.maxHighlights} tagacha.',
+        'Отмечайте только главное: до ${KnowledgeItem.maxHighlights} на заметку.',
+      );
+  String get highlightsSaved => _t(
+        'Key ideas saved. The AI will rewrite its questions around them.',
+        'Asosiy fikrlar saqlandi. AI savollarini ularga moslab qayta yozadi.',
+        'Главное сохранено. ИИ перепишет вопросы с упором на это.',
+      );
+
   String get preparingQuestions => _t('Preparing questions…',
       'Savollar tayyorlanmoqda…', 'Готовим вопросы…');
   String get startNow => _t('Start now', 'Hozir boshlash', 'Начать сейчас');

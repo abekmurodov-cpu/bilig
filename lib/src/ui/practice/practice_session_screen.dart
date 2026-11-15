@@ -17,6 +17,7 @@ import '../../scheduler/spaced_repetition.dart';
 import '../widgets/code_field.dart';
 import '../widgets/code_highlighter.dart';
 import '../widgets/flip_card.dart';
+import '../widgets/markable_text.dart';
 import '../widgets/note_image.dart';
 
 const TextStyle _monoStyle = TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.4);
@@ -233,9 +234,13 @@ class _PracticeSessionScreenState
     final String correct;
     final List<String> distractors;
     final quiz = _item.activeQuiz;
-    if (quiz != null) {
+    if (quiz != null && quiz.distractors.isNotEmpty) {
       correct = quiz.answer;
       distractors = quiz.distractors;
+    } else if (quiz != null) {
+      // The student's own question without wrong options.
+      setState(() => _selfCheck = true);
+      return;
     } else {
       final local = _localDistractors(_item);
       if (local.length < 2) {
@@ -301,7 +306,8 @@ class _PracticeSessionScreenState
       _usesQuiz &&
       _index < _queue.length &&
       _index >= _frontier &&
-      _item.activeQuiz != null;
+      _item.activeQuiz != null &&
+      !_item.activeQuiz!.manual;
 
   /// "Bad question": drops the question shown, skips the card, and — if it
   /// was already answered — undoes that grade, since a bad question shouldn't
@@ -423,7 +429,9 @@ class _PracticeSessionScreenState
       return _buildSelfCheck(
         widget.config.method == PracticeMethod.typeAnswer
             ? context.s.noAnswerToCheck
-            : context.s.noAiQuestion,
+            : _item.activeQuiz?.manual ?? false
+                ? context.s.ownQuestionSelfCheck
+                : context.s.noAiQuestion,
       );
     }
     return switch (widget.config.method) {
@@ -531,7 +539,9 @@ class _PracticeSessionScreenState
                                   letterSpacing: 1.2,
                                   color: theme.colorScheme.primary)),
                           const SizedBox(height: 8),
-                          Text(_revealAnswer ?? context.s.noAnswerRecorded,
+                          MarkableText(
+                              text: _revealAnswer ?? context.s.noAnswerRecorded,
+                              highlights: _item.highlights,
                               style: theme.textTheme.titleMedium),
                         ],
                       ),
@@ -594,6 +604,7 @@ class _PracticeSessionScreenState
                       back: _cardFace(
                         context.s.answerLabel,
                         _revealAnswer ?? context.s.noAnswerRecorded,
+                        highlights: _item.highlights,
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -642,7 +653,8 @@ class _PracticeSessionScreenState
     );
   }
 
-  Widget _cardFace(String label, String text, {bool withImage = false}) {
+  Widget _cardFace(String label, String text,
+      {bool withImage = false, List<String> highlights = const []}) {
     final theme = Theme.of(context);
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -655,7 +667,11 @@ class _PracticeSessionScreenState
           NoteImage(noteId: _item.id, maxHeight: 140),
           const SizedBox(height: 14),
         ],
-        Text(text, style: theme.textTheme.titleLarge, textAlign: TextAlign.center),
+        MarkableText(
+            text: text,
+            highlights: highlights,
+            style: theme.textTheme.titleLarge,
+            textAlign: TextAlign.center),
       ],
     );
   }

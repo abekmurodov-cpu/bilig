@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show listEquals;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/knowledge_item.dart';
@@ -194,13 +195,77 @@ class QuizPrep extends Notifier<QuizPrepState> {
     for (final sent in batch) {
       final now = current[sent.id];
       if (now == null) continue;
-      if (now.front != sent.front || now.back != sent.back) continue;
+      if (now.front != sent.front ||
+          now.back != sent.back ||
+          !listEquals(now.highlights, sent.highlights) ||
+          !now.needsQuiz) {
+        continue;
+      }
       final good = usableQuizzes(now, quizzes[sent.id] ?? const []);
       if (good.isEmpty) continue;
       updates.add(applyQuizzes(now, good));
     }
     if (updates.isNotEmpty) {
       await ref.read(knowledgeListProvider.notifier).persistAll(updates);
+    }
+  }
+
+  /// Writes [count] more questions for note [id] right away (the "+1" / "+3"
+  /// buttons on a note), avoiding the ones it has and the rejected ones.
+  /// Returns how many were added; throws [LlmException] when the AI fails.
+  Future<int> generateMore(String id, {int count = 1}) async {
+    final item = _note(id);
+    final room = KnowledgeItem.maxQuizzes - item.quizVariants.length;
+    if (room <= 0) return 0;
+    final fresh = await _ask(item, count < room ? count : room);
+    final now = _note(id);
+    final added = freshQuizzes(now, fresh, limit: room);
+    if (added.isEmpty) return 0;
+    await ref.read(knowledgeListProvider.notifier).persist(
+        now.withQuizzes([...now.quizVariants, ...added]));
+    return added.length;
+  }
+
+  /// Replaces question [index] of note [id] with a new AI question. The old
+  /// one is remembered as rejected. Nothing changes if the AI fails.
+  Future<bool> rewrite(String id, int index) async {
+    final item = _note(id);
+    final variants = item.quizVariants;
+    if (index < 0 || index >= variants.length) return false;
+    final old = variants[index];
+    // Ask as if the old question were already rejected, so it isn't returned.
+    final asked = item.copyWith(
+        badQuestions: [...item.badQuestions, KnowledgeItem.badKey(old)]);
+    final fresh = freshQuizzes(asked, await _ask(asked, 1), limit: 1);
+    if (fresh.isEmpty) return false;
+    final now = _note(id);
+    final at = now.quizVariants.indexWhere((v) =>
+        v.question == old.question && v.answer == old.answer);
+    if (at < 0) return false;
+    await ref.read(knowledgeListProvider.notifier).persist(now.withQuizzes(
+      [...now.quizVariants]..[at] = fresh.single,
+      badQuestions: old.manual
+          ? null
+          : [...now.badQuestions, KnowledgeItem.badKey(old)],
+    ));
+    return true;
+  }
+
+  KnowledgeItem _note(String id) =>
+      (ref.read(knowledgeListProvider).asData?.value ?? const <KnowledgeItem>[])
+          .firstWhere((i) => i.id == id);
+
+  Future<List<McQuiz>> _ask(KnowledgeItem item, int count) async {
+    final llm = ref.read(llmProvider);
+    if (llm == null) {
+      throw const LlmException(LlmErrorKind.auth, 'No AI connected');
+    }
+    try {
+      final result = await llm.generateQuizzes([item], variantCount: count);
+      return result[item.id] ?? const [];
+    } on LlmException catch (e) {
+      reportError(e);
+      rethrow;
     }
   }
 
@@ -245,27 +310,60 @@ List<McQuiz> usableQuizzes(KnowledgeItem item, List<McQuiz> quizzes) {
   return good.take(limit).toList();
 }
 
-/// Writes [quizzes] (at least one) onto [item]: the first fills the stored
-/// quiz fields, the rest become [KnowledgeItem.extraQuizzes]. Content notes
-/// (anything but a question) get reworded questions as their practice
-/// prompts; answer-less notes get the first concise answer as their answer.
+/// New questions asked for on a note that may already have some: good
+/// ones, not repeating its questions or rejected ones. Unlike background
+/// generation, a question note may get rephrased questions here.
+List<QuizVariant> freshQuizzes(KnowledgeItem item, List<McQuiz> quizzes,
+    {required int limit}) {
+  String key(String? question, String answer) =>
+      '${normalizeAnswer(question ?? item.front)}|${normalizeAnswer(answer)}';
+  final seenQuestions = {
+    for (final b in item.badQuestions) normalizeAnswer(b),
+    for (final v in item.quizVariants)
+      if (v.question != null) normalizeAnswer(v.question!),
+  };
+  final seen = {for (final v in item.quizVariants) key(v.question, v.answer)};
+  final out = <QuizVariant>[];
+  for (final quiz in quizzes) {
+    if (quizProblem(quiz) != null) continue;
+    final ownWording =
+        normalizeAnswer(quiz.question) == normalizeAnswer(item.front);
+    final question = ownWording && item.type == KnowledgeType.question
+        ? null
+        : quiz.question;
+    if (question != null && seenQuestions.contains(normalizeAnswer(question))) {
+      continue;
+    }
+    if (question == null &&
+        seenQuestions.contains(normalizeAnswer(quiz.answer))) {
+      continue;
+    }
+    if (!seen.add(key(question, quiz.answer))) continue;
+    if (question != null) seenQuestions.add(normalizeAnswer(question));
+    out.add(QuizVariant(
+        question: question, answer: quiz.answer, distractors: quiz.distractors));
+  }
+  return out.take(limit).toList();
+}
+
+/// Writes [quizzes] (at least one) onto [item] as its AI questions, after
+/// any the student wrote. Content notes (anything but a question) get
+/// reworded questions as their practice prompts; answer-less notes get the
+/// first concise answer as their answer.
 KnowledgeItem applyQuizzes(KnowledgeItem item, List<McQuiz> quizzes) {
   final isQuestion = item.type == KnowledgeType.question;
-  QuizVariant variant(McQuiz q) => QuizVariant(
+  final withAnswer = item.hasAnswer
+      ? item
+      : item.copyWith(back: quizzes.first.answer);
+  return withAnswer.withQuizzes([
+    for (final v in item.quizVariants) if (v.manual) v,
+    for (final q in quizzes)
+      QuizVariant(
         question: isQuestion ? null : q.question,
         answer: q.answer,
         distractors: q.distractors,
-      );
-  final first = quizzes.first;
-  return KnowledgeItem.fromMap({
-    ...item.toMap(),
-    'quizQuestion': isQuestion ? null : first.question,
-    'mcAnswer': first.answer,
-    'mcDistractors': first.distractors,
-    'back': item.hasAnswer ? item.back : first.answer,
-    'extraQuizzes': [for (final q in quizzes.skip(1)) variant(q).toMap()],
-  });
+      ),
+  ]);
 }
-
 final quizPrepProvider =
     NotifierProvider<QuizPrep, QuizPrepState>(QuizPrep.new);

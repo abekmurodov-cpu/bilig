@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 
 import '../data/image_store.dart';
 import '../data/knowledge_repository.dart';
+import '../models/highlights.dart';
 import '../models/knowledge_item.dart';
 import '../practice/code_drills.dart';
 import '../scheduler/spaced_repetition.dart';
@@ -124,13 +125,30 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
     final contentChanged = item.front != front.trim() ||
         (item.back ?? '') != (back?.trim() ?? '') ||
         item.type != type;
-    // A cached quiz written for the old wording would now be wrong.
-    final base = contentChanged ? item.withoutQuiz() : item;
+    final newFront = front.trim();
+    final newBack = back?.trim().isEmpty ?? true ? null : back!.trim();
+    // AI questions written for the old wording would now be wrong; the
+    // student's own questions are theirs to keep or change.
+    final base = contentChanged
+        ? item.withoutAiQuizzes().copyWith(badQuestions: const [])
+        : item;
     final updated = base.copyWith(
-      front: front.trim(),
-      back: back?.trim().isEmpty ?? true ? null : back!.trim(),
+      front: newFront,
+      back: newBack,
       type: type,
       category: category?.trim().isEmpty ?? true ? null : category!.trim(),
+      highlights: keptHighlights(item.highlights, newFront, newBack),
+      updatedAt: DateTime.now(),
+    );
+    await _repo.save(updated);
+    await _refresh();
+  }
+
+  /// Sets the note's marked key ideas. The AI's questions are rewritten
+  /// around them (the student's own questions stay).
+  Future<void> setHighlights(KnowledgeItem item, List<String> highlights) async {
+    final updated = item.withoutAiQuizzes().copyWith(
+      highlights: highlights,
       updatedAt: DateTime.now(),
     );
     await _repo.save(updated);

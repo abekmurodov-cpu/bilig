@@ -18,18 +18,29 @@ enum KnowledgeType {
       };
 }
 
-/// One AI-written practice question for a note: a [question] (null for notes
-/// that are already a question — their own wording is used), its short
-/// [answer], and wrong options.
+/// One practice question for a note: a [question] (null when the note's own
+/// wording is the question), its short [answer], and wrong options. Written by
+/// the AI, or by the student ([manual]); a student's own question may have no
+/// wrong options, and is then asked as a self-check.
 class QuizVariant {
-  const QuizVariant({this.question, required this.answer, required this.distractors});
+  const QuizVariant({
+    this.question,
+    required this.answer,
+    required this.distractors,
+    this.manual = false,
+  });
 
   final String? question;
   final String answer;
   final List<String> distractors;
+  final bool manual;
 
-  Map<String, dynamic> toMap() =>
-      {'question': question, 'answer': answer, 'distractors': distractors};
+  Map<String, dynamic> toMap() => {
+        'question': question,
+        'answer': answer,
+        'distractors': distractors,
+        if (manual) 'manual': true,
+      };
 
   static QuizVariant? fromMap(Object? map) {
     if (map is! Map) return null;
@@ -40,6 +51,7 @@ class QuizVariant {
       question: map['question'] as String?,
       answer: answer,
       distractors: [for (final d in distractors) '$d'],
+      manual: map['manual'] == true,
     );
   }
 }
@@ -75,6 +87,8 @@ class KnowledgeItem {
     this.reorderSegments = const [],
     this.extraQuizzes = const [],
     this.badQuestions = const [],
+    this.quizManual = false,
+    this.highlights = const [],
   }) : updatedAt = updatedAt ?? createdAt;
 
   final String id;
@@ -131,6 +145,21 @@ class KnowledgeItem {
   /// Most flagged questions remembered per note.
   static const int maxBadQuestions = 5;
 
+  /// Whether the first question ([quizQuestion]/[mcAnswer]) is the student's
+  /// own; the rest carry it in [QuizVariant.manual].
+  final bool quizManual;
+
+  /// Key words and ideas the student marked in [front]/[back]. Stored as the
+  /// marked text (matched case-insensitively), so they survive small edits.
+  /// The AI builds its questions around them.
+  final List<String> highlights;
+
+  /// Most highlights per note: marking everything marks nothing.
+  static const int maxHighlights = 10;
+
+  /// Most questions kept per note.
+  static const int maxQuizzes = 8;
+
   // --- Pre-generated code drills (code notes only; no LLM at practice) ---
   /// The code with blanks replaced by «0», «1», … placeholders, paired with
   /// [fillBlankAnswers]. Used by the fill-in-the-blank coding drill.
@@ -147,15 +176,70 @@ class KnowledgeItem {
 
   /// Every cached question, the stored first one included.
   List<QuizVariant> get quizVariants => [
-        if (hasMcOptions)
-          QuizVariant(question: quizQuestion, answer: mcAnswer!, distractors: mcDistractors),
+        if (mcAnswer != null && mcAnswer!.trim().isNotEmpty)
+          QuizVariant(
+            question: quizQuestion,
+            answer: mcAnswer!,
+            distractors: mcDistractors,
+            manual: quizManual,
+          ),
         ...extraQuizzes,
       ];
+
+  /// This note with exactly [variants] as its questions: the first goes into
+  /// the stored quiz fields (what older app versions and synced copies
+  /// understand), the rest into [extraQuizzes].
+  KnowledgeItem withQuizzes(List<QuizVariant> variants, {List<String>? badQuestions}) {
+    final first = variants.isEmpty ? null : variants.first;
+    final bad = badQuestions ?? this.badQuestions;
+    return KnowledgeItem.fromMap({
+      ...toMap(),
+      'quizQuestion': first?.question,
+      'mcAnswer': first?.answer,
+      'mcDistractors': first?.distractors ?? const <String>[],
+      'quizManual': first?.manual ?? false,
+      'extraQuizzes': [for (final v in variants.skip(1)) v.toMap()],
+      'badQuestions': bad.sublist(
+          bad.length > maxBadQuestions ? bad.length - maxBadQuestions : 0),
+    });
+  }
+
+  /// The wording remembered when [variant] is rejected, so it isn't
+  /// generated again.
+  static String badKey(QuizVariant variant) => variant.question ?? variant.answer;
+
+  /// This note without question [index]. A rejected AI question is
+  /// remembered so the AI doesn't write it again; the student's own isn't.
+  KnowledgeItem removeQuiz(int index) {
+    final variants = quizVariants;
+    if (index < 0 || index >= variants.length) return this;
+    final removed = variants.removeAt(index);
+    return withQuizzes(variants,
+        badQuestions: removed.manual ? null : [...badQuestions, badKey(removed)]);
+  }
+
+  /// This note with question [index] replaced by [variant] (or added at the
+  /// end when [index] is null).
+  KnowledgeItem putQuiz(QuizVariant variant, {int? index}) {
+    final variants = quizVariants;
+    if (index == null || index < 0 || index >= variants.length) {
+      variants.add(variant);
+    } else {
+      variants[index] = variant;
+    }
+    return withQuizzes(variants);
+  }
+
+  /// This note keeping only the student's own questions, so the AI writes
+  /// its questions again (after the highlights changed). Rejections stay
+  /// remembered.
+  KnowledgeItem withoutAiQuizzes() =>
+      withQuizzes([for (final v in quizVariants) if (v.manual) v]);
 
   /// Index of the question practice asks now. It moves on with every review
   /// (a correct one raises [repetitions], a lapse raises [lapses]), so the
   /// note is asked a different way next time.
-  int get _activeIndex {
+  int get activeQuizIndex {
     final n = quizVariants.length;
     return n == 0 ? 0 : (repetitions + lapses) % n;
   }
@@ -163,7 +247,7 @@ class KnowledgeItem {
   /// The question practice asks now, or null when none is cached.
   QuizVariant? get activeQuiz {
     final variants = quizVariants;
-    return variants.isEmpty ? null : variants[_activeIndex];
+    return variants.isEmpty ? null : variants[activeQuizIndex];
   }
 
   /// What practice shows as the prompt: the active question if it rewords the
@@ -176,35 +260,24 @@ class KnowledgeItem {
   /// This note without its active question (flagged as bad), remembering the
   /// wording so it isn't generated again. When it was the last question the
   /// note needs a new quiz.
-  KnowledgeItem dropActiveQuiz() {
-    final variants = quizVariants;
-    if (variants.isEmpty) return this;
-    final dropped = variants.removeAt(_activeIndex);
-    final bad = [...badQuestions, dropped.question ?? dropped.answer];
-    final first = variants.isEmpty ? null : variants.first;
-    return KnowledgeItem.fromMap({
-      ...toMap(),
-      'quizQuestion': first?.question,
-      'mcAnswer': first?.answer,
-      'mcDistractors': first?.distractors ?? const <String>[],
-      'extraQuizzes': [for (final v in variants.skip(1)) v.toMap()],
-      'badQuestions': bad.sublist(
-          bad.length > maxBadQuestions ? bad.length - maxBadQuestions : 0),
-    });
-  }
+  KnowledgeItem dropActiveQuiz() =>
+      quizVariants.isEmpty ? this : removeQuiz(activeQuizIndex);
 
   /// True once a full multiple-choice set (correct + ≥1 distractor) is cached.
   bool get hasMcOptions =>
       mcAnswer != null && mcAnswer!.trim().isNotEmpty && mcDistractors.isNotEmpty;
 
-  /// True when practice still lacks a cached AI quiz for this note: no option
-  /// set yet, or a content note (anything but a question) without its reworded
-  /// [quizQuestion].
-  bool get needsQuiz =>
-      front.trim().isNotEmpty &&
-      (!hasMcOptions ||
-          (type != KnowledgeType.question &&
-              (quizQuestion == null || quizQuestion!.trim().isEmpty)));
+  /// True when the AI should write questions for this note: it has none yet,
+  /// or (for a content note — anything but a question) none that rewords it.
+  /// A note with questions the student wrote is left alone.
+  bool get needsQuiz {
+    if (front.trim().isEmpty) return false;
+    final variants = quizVariants;
+    if (variants.any((v) => v.manual)) return false;
+    if (variants.isEmpty || !hasMcOptions) return true;
+    return type != KnowledgeType.question &&
+        variants.every((v) => v.question == null || v.question!.trim().isEmpty);
+  }
 
   /// This note with its cached AI quiz dropped, so it gets regenerated. Used
   /// when the note's content is edited and the old quiz no longer matches.
@@ -213,6 +286,7 @@ class KnowledgeItem {
         'quizQuestion': null,
         'mcAnswer': null,
         'mcDistractors': const <String>[],
+        'quizManual': false,
         'extraQuizzes': const <Object>[],
         'badQuestions': const <String>[],
       });
@@ -249,6 +323,7 @@ class KnowledgeItem {
     List<String>? reorderSegments,
     List<QuizVariant>? extraQuizzes,
     List<String>? badQuestions,
+    List<String>? highlights,
   }) {
     return KnowledgeItem(
       id: id,
@@ -274,6 +349,8 @@ class KnowledgeItem {
       reorderSegments: reorderSegments ?? this.reorderSegments,
       extraQuizzes: extraQuizzes ?? this.extraQuizzes,
       badQuestions: badQuestions ?? this.badQuestions,
+      quizManual: quizManual,
+      highlights: highlights ?? this.highlights,
     );
   }
 
@@ -301,6 +378,8 @@ class KnowledgeItem {
         'reorderSegments': reorderSegments,
         'extraQuizzes': [for (final q in extraQuizzes) q.toMap()],
         'badQuestions': badQuestions,
+        if (quizManual) 'quizManual': true,
+        'highlights': highlights,
       };
 
   factory KnowledgeItem.fromMap(Map<String, dynamic> map) => KnowledgeItem(
@@ -344,6 +423,10 @@ class KnowledgeItem {
         ],
         badQuestions:
             (map['badQuestions'] as List?)?.map((e) => e.toString()).toList() ??
+                const [],
+        quizManual: map['quizManual'] == true,
+        highlights:
+            (map['highlights'] as List?)?.map((e) => e.toString()).toList() ??
                 const [],
       );
 
