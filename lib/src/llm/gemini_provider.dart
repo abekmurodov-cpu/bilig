@@ -22,7 +22,11 @@ class GeminiProvider extends HttpLlm {
   String get displayName => 'Gemini ($model)';
 
   @override
-  Future<String> send(String prompt, {required bool json}) async {
+  bool get canTranscribe => true;
+
+  @override
+  Future<String> send(String prompt,
+      {required bool json, List<Attachment> attachments = const []}) async {
     final uri = Uri.parse('$_base/models/$model:generateContent?key=$apiKey');
     final generationConfig = <String, Object>{
       if (json) 'responseMimeType': 'application/json',
@@ -38,6 +42,13 @@ class GeminiProvider extends HttpLlm {
         'contents': [
           {
             'parts': [
+              for (final a in attachments)
+                {
+                  'inline_data': {
+                    'mime_type': a.mimeType,
+                    'data': base64Encode(a.bytes),
+                  },
+                },
               {'text': prompt},
             ],
           },

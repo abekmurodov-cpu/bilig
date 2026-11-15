@@ -10,7 +10,92 @@ abstract class PromptedLlm implements LlmProvider {
   /// Sends [prompt] and returns the model's reply text. With [json] the
   /// backend should switch on its strict-JSON output mode when it has one.
   /// Should throw [LlmException] on failure.
-  Future<String> complete(String prompt, {bool json = false});
+  Future<String> complete(String prompt,
+      {bool json = false, List<Attachment> attachments = const []});
+
+  @override
+  bool get canReadImages => true;
+
+  @override
+  bool get canTranscribe => false;
+
+  /// Most notes proposed from one photo or text.
+  static const int maxDrafts = 25;
+
+  static String _notesRules(String source) =>
+      'You turn study material into flashcard notes for a spaced-repetition '
+      'app. From $source, write one note per important, self-contained fact, '
+      'term, rule or idea (usually 3-12; more only for dense material, at '
+      'most $maxDrafts). Skip titles, page numbers, filler and anything not '
+      'worth remembering.\n'
+      'Return JSON only: {"notes": [{"front": "...", "back": "...", '
+      '"type": "fact|concept|command|code|question", "category": "..."}]}\n'
+      '- "front": a short cue to recall from: a term, a question, or a '
+      'command (max ~15 words).\n'
+      '- "back": the answer or explanation, 1-3 sentences (for code, the '
+      'code itself).\n'
+      '- "category": one short subject label (1-2 words), the same for '
+      'related notes.\n'
+      '- Write in the same language as the material.\n'
+      'If there is nothing worth studying, return {"notes": []}.';
+
+  @override
+  Future<List<NoteDraft>> notesFromImage(Attachment image) async {
+    final raw = await complete(_notesRules('the attached photo'),
+        json: true, attachments: [image]);
+    return parseDrafts(raw);
+  }
+
+  @override
+  Future<List<NoteDraft>> notesFromText(String text) async {
+    final clipped = text.length > 12000 ? text.substring(0, 12000) : text;
+    final raw = await complete(
+        '${_notesRules('the text below')}\n\nText:\n$clipped',
+        json: true);
+    return parseDrafts(raw);
+  }
+
+  /// Parses proposed notes, dropping empty and repeated ones.
+  static List<NoteDraft> parseDrafts(String raw) {
+    final decoded = decodeJsonLoose(raw);
+    final list = decoded is Map ? decoded['notes'] : decoded;
+    if (list is! List) {
+      throw const LlmException(
+          LlmErrorKind.badResponse, 'The AI returned no notes');
+    }
+    final seen = <String>{};
+    final out = <NoteDraft>[];
+    for (final n in list) {
+      if (n is! Map) continue;
+      final front = '${n['front'] ?? ''}'.trim();
+      if (front.isEmpty || !seen.add(front.toLowerCase())) continue;
+      final back = '${n['back'] ?? ''}'.trim();
+      final category = '${n['category'] ?? ''}'.trim();
+      out.add(NoteDraft(
+        front: front,
+        back: back.isEmpty ? null : back,
+        type: KnowledgeType.values.firstWhere(
+            (t) => t.name == '${n['type']}'.trim().toLowerCase(),
+            orElse: () => KnowledgeType.concept),
+        category: category.isEmpty ? null : category,
+      ));
+      if (out.length == maxDrafts) break;
+    }
+    return out;
+  }
+
+  /// Transcribes by sending the audio with the prompt; only backends whose
+  /// models hear audio (see [canTranscribe]) should be asked.
+  @override
+  Future<String> transcribe(Attachment audio) async {
+    final text = await complete(
+      'Transcribe this voice recording exactly as spoken, in the language '
+      'spoken, with normal punctuation. Reply with the transcript only. If '
+      'nothing is said, reply with an empty line.',
+      attachments: [audio],
+    );
+    return text.trim();
+  }
 
   /// Note details longer than this are trimmed before prompting: the quiz only
   /// needs the gist, and long code/explanations burn tokens.

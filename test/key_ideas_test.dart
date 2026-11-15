@@ -24,7 +24,8 @@ class CannedLlm extends PromptedLlm {
   String? lastPrompt;
 
   @override
-  Future<String> complete(String prompt, {bool json = false}) async {
+  Future<String> complete(String prompt,
+      {bool json = false, List<Attachment> attachments = const []}) async {
     lastPrompt = prompt;
     return reply;
   }

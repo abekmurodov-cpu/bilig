@@ -33,6 +33,8 @@ class SettingsRepository {
   static const String kReminderEnabled = 'reminderEnabled';
   static const String kReminderHour = 'reminderHour';
   static const String kReminderMinute = 'reminderMinute';
+  static const String kVoiceMode = 'voiceMode';
+  static const String kVoiceLocale = 'voiceLocale';
 
   final Box _box;
 

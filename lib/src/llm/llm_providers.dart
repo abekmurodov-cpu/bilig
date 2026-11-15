@@ -54,6 +54,8 @@ HttpLlm createLlm(AiConfig config, {http.Client? client}) {
         extraHeaders: config.service == AiService.openrouter
             ? const {'X-Title': 'Bilig'}
             : const {},
+        vision: config.service.vision,
+        transcribeModel: config.service.transcribeModel,
         client: client,
       ),
   };

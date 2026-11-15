@@ -16,6 +16,8 @@ class OpenAiCompatibleProvider extends HttpLlm {
     required this.apiKey,
     required this.model,
     this.extraHeaders = const {},
+    this.vision = true,
+    this.transcribeModel,
     super.client,
     super.sleep,
   }) : baseUrl = baseUrl.replaceFirst(RegExp(r'/+$'), '');
@@ -28,6 +30,48 @@ class OpenAiCompatibleProvider extends HttpLlm {
   final String apiKey;
   final String model;
   final Map<String, String> extraHeaders;
+
+  /// Whether the service's models take images (DeepSeek's don't).
+  final bool vision;
+
+  /// The speech-to-text model, for services that have one (OpenAI, Groq).
+  final String? transcribeModel;
+
+  @override
+  bool get canReadImages => vision;
+
+  @override
+  bool get canTranscribe => transcribeModel != null;
+
+  @override
+  Future<String> transcribe(Attachment audio) async {
+    final model = transcribeModel;
+    if (model == null) return super.transcribe(audio);
+    final request = http.MultipartRequest(
+        'POST', Uri.parse('$baseUrl/audio/transcriptions'))
+      ..headers.addAll({
+        if (apiKey.isNotEmpty) 'Authorization': 'Bearer $apiKey',
+        ...extraHeaders,
+      })
+      ..fields['model'] = model
+      ..files.add(http.MultipartFile.fromBytes('file', audio.bytes,
+          filename: audio.mimeType.contains('wav') ? 'voice.wav' : 'voice.m4a'));
+    final resp = await guard(
+        client.send(request).then(http.Response.fromStream));
+    if (resp.statusCode != 200) throw errorFor(resp);
+    final Object? data;
+    try {
+      data = jsonDecode(utf8.decode(resp.bodyBytes));
+    } on FormatException {
+      throw LlmException(
+          LlmErrorKind.badResponse, '$serviceName sent an unreadable reply');
+    }
+    final text = (data is Map ? '${data['text'] ?? ''}' : '').trim();
+    if (text.isEmpty) {
+      throw LlmException(LlmErrorKind.badResponse, '$serviceName heard nothing');
+    }
+    return text;
+  }
 
   /// Turned off for the rest of the session when the model rejects
   /// `response_format` (some OpenRouter and local models do).
@@ -43,7 +87,8 @@ class OpenAiCompatibleProvider extends HttpLlm {
       };
 
   @override
-  Future<String> send(String prompt, {required bool json}) async {
+  Future<String> send(String prompt,
+      {required bool json, List<Attachment> attachments = const []}) async {
     final useJsonMode = json && _jsonMode;
     final resp = await guard(client.post(
       Uri.parse('$baseUrl/chat/completions'),
@@ -51,7 +96,21 @@ class OpenAiCompatibleProvider extends HttpLlm {
       body: jsonEncode({
         'model': model,
         'messages': [
-          {'role': 'user', 'content': prompt},
+          {
+            'role': 'user',
+            'content': attachments.isEmpty
+                ? prompt
+                : [
+                    {'type': 'text', 'text': prompt},
+                    for (final a in attachments.where((a) => a.isImage))
+                      {
+                        'type': 'image_url',
+                        'image_url': {
+                          'url': 'data:${a.mimeType};base64,${base64Encode(a.bytes)}',
+                        },
+                      },
+                  ],
+          },
         ],
         if (useJsonMode) 'response_format': {'type': 'json_object'},
       }),
@@ -60,7 +119,7 @@ class OpenAiCompatibleProvider extends HttpLlm {
         useJsonMode &&
         resp.body.contains('response_format')) {
       _jsonMode = false;
-      return send(prompt, json: json);
+      return send(prompt, json: json, attachments: attachments);
     }
     if (resp.statusCode != 200) throw errorFor(resp);
 

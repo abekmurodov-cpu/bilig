@@ -42,7 +42,8 @@ class AnthropicProvider extends HttpLlm {
       RegExp(r'^claude-(opus|sonnet|haiku|fable)-5').hasMatch(model);
 
   @override
-  Future<String> send(String prompt, {required bool json}) async {
+  Future<String> send(String prompt,
+      {required bool json, List<Attachment> attachments = const []}) async {
     final resp = await guard(client.post(
       Uri.parse('$_base/messages'),
       headers: _headers,
@@ -50,7 +51,23 @@ class AnthropicProvider extends HttpLlm {
         'model': model,
         'max_tokens': maxTokens,
         'messages': [
-          {'role': 'user', 'content': prompt},
+          {
+            'role': 'user',
+            'content': attachments.isEmpty
+                ? prompt
+                : [
+                    for (final a in attachments.where((a) => a.isImage))
+                      {
+                        'type': 'image',
+                        'source': {
+                          'type': 'base64',
+                          'media_type': a.mimeType,
+                          'data': base64Encode(a.bytes),
+                        },
+                      },
+                    {'type': 'text', 'text': prompt},
+                  ],
+          },
         ],
         if (_supportsEffort) 'output_config': {'effort': 'low'},
       }),

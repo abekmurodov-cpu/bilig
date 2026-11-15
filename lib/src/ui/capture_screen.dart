@@ -8,11 +8,17 @@ import '../llm/llm_providers.dart';
 import '../models/highlights.dart';
 import '../models/knowledge_item.dart';
 import '../providers/knowledge_providers.dart';
+import 'bulk_add_screen.dart';
 import 'widgets/image_picking.dart';
 import 'widgets/markable_text.dart';
+import 'widgets/voice_input.dart';
 
 class CaptureScreen extends ConsumerStatefulWidget {
-  const CaptureScreen({super.key});
+  const CaptureScreen({super.key, this.initialFront, this.initialBack});
+
+  /// Prefilled text, e.g. shared from another app.
+  final String? initialFront;
+  final String? initialBack;
 
   @override
   ConsumerState<CaptureScreen> createState() => _CaptureScreenState();
@@ -20,8 +26,10 @@ class CaptureScreen extends ConsumerStatefulWidget {
 
 class _CaptureScreenState extends ConsumerState<CaptureScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _frontController = HighlightingController();
-  final _backController = HighlightingController();
+  late final _frontController = HighlightingController()
+    ..text = widget.initialFront ?? '';
+  late final _backController = HighlightingController()
+    ..text = widget.initialBack ?? '';
   final _categoryController = TextEditingController();
   KnowledgeType _type = KnowledgeType.concept;
   bool _saving = false;
@@ -160,6 +168,19 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
     if (mounted) Navigator.of(context).pop();
   }
 
+  /// Many notes at once replace this single one: go there and close this.
+  Future<void> _openBulk(BulkSource source) async {
+    final navigator = Navigator.of(context);
+    await navigator.pushReplacement(MaterialPageRoute(
+      builder: (_) => BulkAddScreen(
+        source: source,
+        initialText: source == BulkSource.text && _backController.text.isNotEmpty
+            ? _backController.text
+            : null,
+      ),
+    ));
+  }
+
   Future<void> _pickImage() async {
     final bytes = await pickImageBytes(context);
     if (bytes != null && mounted) setState(() => _imageBytes = bytes);
@@ -175,6 +196,23 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                ActionChip(
+                  avatar: const Icon(Icons.photo_camera_outlined, size: 18),
+                  label: Text(context.s.photoToNotes),
+                  onPressed: () => _openBulk(BulkSource.photo),
+                ),
+                ActionChip(
+                  avatar: const Icon(Icons.content_paste, size: 18),
+                  label: Text(context.s.pasteAndSplit),
+                  onPressed: () => _openBulk(BulkSource.text),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
             Text(context.s.whatKind,
                 style: Theme.of(context).textTheme.labelLarge),
             const SizedBox(height: 8),
@@ -203,6 +241,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                 hintText:
                     context.s.promptHint,
                 border: OutlineInputBorder(),
+                suffixIcon: VoiceButton(controller: _frontController),
               ),
               validator: (v) =>
                   (v == null || v.trim().isEmpty) ? context.s.promptRequired : null,
@@ -219,6 +258,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                 labelText: context.s.answerOptional,
                 hintText: context.s.answerHint,
                 border: OutlineInputBorder(),
+                suffixIcon: VoiceButton(controller: _backController),
               ),
             ),
             if (aiAttached) ...[

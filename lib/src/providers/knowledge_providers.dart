@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 
 import '../data/image_store.dart';
 import '../data/knowledge_repository.dart';
+import '../llm/llm_provider.dart';
 import '../models/highlights.dart';
 import '../models/knowledge_item.dart';
 import '../practice/code_drills.dart';
@@ -75,6 +76,31 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
       highlights: keptHighlights(highlights, front.trim(), back?.trim()),
     );
     await _repo.save(item);
+    await _refresh();
+  }
+
+  /// Saves several new notes at once (from a photo, a paste or an import),
+  /// with one list refresh. [category] fills in notes that have none.
+  Future<void> addDrafts(List<NoteDraft> drafts, {String? category}) async {
+    final now = DateTime.now();
+    final fallback = category?.trim().isEmpty ?? true ? null : category!.trim();
+    for (final d in drafts) {
+      final back = d.back?.trim();
+      final code = d.type == KnowledgeType.code ? back ?? '' : '';
+      final drills = code.isNotEmpty ? generateCodeDrills(code) : null;
+      await _repo.save(KnowledgeItem(
+        id: _uuid.v4(),
+        front: d.front.trim(),
+        back: back == null || back.isEmpty ? null : back,
+        type: d.type,
+        category: fallback ?? d.category,
+        createdAt: now,
+        dueDate: now,
+        fillBlankTemplate: drills?.fillBlankTemplate,
+        fillBlankAnswers: drills?.fillBlankAnswers ?? const [],
+        reorderSegments: drills?.reorderSegments ?? const [],
+      ));
+    }
     await _refresh();
   }
 

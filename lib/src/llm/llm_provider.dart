@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import '../models/knowledge_item.dart';
 
 /// Result of grading a free-typed answer with an LLM.
@@ -22,6 +24,49 @@ class McQuiz {
   final String question;
   final String answer;
   final List<String> distractors;
+}
+
+/// A file sent along with a prompt: a photo or a voice recording.
+class Attachment {
+  const Attachment(this.mimeType, this.bytes);
+
+  final String mimeType;
+  final Uint8List bytes;
+
+  bool get isImage => mimeType.startsWith('image/');
+
+  /// An image attachment, its type read from the file's first bytes.
+  factory Attachment.image(Uint8List bytes) {
+    final png = bytes.length > 4 && bytes[0] == 0x89 && bytes[1] == 0x50;
+    final webp = bytes.length > 12 &&
+        String.fromCharCodes(bytes.sublist(8, 12)) == 'WEBP';
+    return Attachment(
+        png ? 'image/png' : (webp ? 'image/webp' : 'image/jpeg'), bytes);
+  }
+}
+
+/// A note the AI proposed (from a photo or pasted text) for the student to
+/// keep or drop before anything is saved.
+class NoteDraft {
+  const NoteDraft({
+    required this.front,
+    this.back,
+    this.type = KnowledgeType.concept,
+    this.category,
+  });
+
+  final String front;
+  final String? back;
+  final KnowledgeType type;
+  final String? category;
+
+  NoteDraft copyWith({String? front, String? back, KnowledgeType? type}) =>
+      NoteDraft(
+        front: front ?? this.front,
+        back: back ?? this.back,
+        type: type ?? this.type,
+        category: category,
+      );
 }
 
 /// Why an LLM call failed, so callers can react (pause, tell the user) instead
@@ -93,6 +138,22 @@ abstract class LlmProvider {
 
   /// Suggests a short category/tag for a freshly captured note.
   Future<String> suggestCategory(String front, String? back);
+
+  /// Whether this AI can read photos (most current models can).
+  bool get canReadImages;
+
+  /// Whether this AI can turn a voice recording into text.
+  bool get canTranscribe;
+
+  /// Reads study material in a photo (a textbook page, slide, whiteboard)
+  /// and proposes notes from it.
+  Future<List<NoteDraft>> notesFromImage(Attachment image);
+
+  /// Splits pasted study text (a lecture summary, an article) into notes.
+  Future<List<NoteDraft>> notesFromText(String text);
+
+  /// Writes down what is said in a voice recording, in its own language.
+  Future<String> transcribe(Attachment audio);
 
   /// Picks the few key words or ideas in [item] worth highlighting, copied
   /// exactly from the note's text.

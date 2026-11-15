@@ -17,6 +17,7 @@ enum AiService {
     api: AiApi.openAi,
     baseUrl: 'https://api.openai.com/v1',
     keyUrl: 'https://platform.openai.com/api-keys',
+    transcribeModel: 'gpt-4o-mini-transcribe',
     prefer: [r'^gpt-[\d.]+-mini$', r'^gpt-.*mini$', r'^gpt-'],
   ),
   claude(
@@ -34,6 +35,7 @@ enum AiService {
     baseUrl: 'https://api.deepseek.com/v1',
     keyUrl: 'https://platform.deepseek.com/api_keys',
     defaultModel: 'deepseek-chat',
+    vision: false,
   ),
   groq(
     label: 'Groq',
@@ -41,6 +43,7 @@ enum AiService {
     baseUrl: 'https://api.groq.com/openai/v1',
     keyUrl: 'https://console.groq.com/keys',
     freeTier: true,
+    transcribeModel: 'whisper-large-v3-turbo',
     prefer: [r'llama.*versatile', r'gpt-oss', r'llama', r'qwen'],
   ),
   openrouter(
@@ -78,7 +81,15 @@ enum AiService {
     this.freeTier = false,
     this.defaultModel,
     this.prefer = const [],
+    this.vision = true,
+    this.transcribeModel,
   });
+
+  /// Whether the service's chat models read photos.
+  final bool vision;
+
+  /// Speech-to-text model on OpenAI-format services that have one.
+  final String? transcribeModel;
 
   final String label;
   final AiApi api;

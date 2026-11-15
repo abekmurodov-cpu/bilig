@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../capture/share_inbox.dart';
 import '../l10n/app_strings.dart';
 import '../llm/quiz_prep.dart';
 import '../providers/knowledge_providers.dart';
 import '../sync/sync_providers.dart';
+import 'bulk_add_screen.dart';
+import 'capture_screen.dart';
 import 'home_screen.dart';
 import 'notes_screen.dart';
 import 'practice/practice_screen.dart';
@@ -27,7 +30,28 @@ class _AppShellState extends ConsumerState<AppShell> {
   void initState() {
     super.initState();
     // Best-effort silent pull on startup when a sync backend is attached.
-    WidgetsBinding.instance.addPostFrameCallback((_) => _autoSync());
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _autoSync();
+      ShareInbox.listen(_openShared);
+      final initial = await ShareInbox.takeInitial();
+      if (initial != null) _openShared(initial);
+    });
+  }
+
+  /// Shared text or a photo opens the right capture screen: a photo is read
+  /// into notes, a short text becomes one note, a longer one is split.
+  void _openShared(SharedContent content) {
+    if (!mounted) return;
+    final image = content.image;
+    final text = content.text ?? '';
+    if (image != null) {
+      openBulkAdd(context, BulkSource.photo, image: image);
+    } else if (text.length <= 160 && !text.contains('\n')) {
+      Navigator.of(context).push(MaterialPageRoute(
+          builder: (_) => CaptureScreen(initialFront: text)));
+    } else {
+      openBulkAdd(context, BulkSource.text, text: text);
+    }
   }
 
   Future<void> _autoSync() async {

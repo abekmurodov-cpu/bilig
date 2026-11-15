@@ -41,8 +41,34 @@ class FallbackLlm implements LlmProvider {
     }
   }
 
+  /// Like [_run], for a task only some AIs can do: skips whichever can't.
+  Future<T> _runIf<T>(bool Function(LlmProvider llm) can,
+      Future<T> Function(LlmProvider llm) task) {
+    final primaryCan = can(primary), backupCan = can(backup);
+    if (primaryCan && backupCan) return _run(task);
+    return task(primaryCan || !backupCan ? primary : backup);
+  }
+
   @override
   String get displayName => primary.displayName;
+
+  @override
+  bool get canReadImages => primary.canReadImages || backup.canReadImages;
+
+  @override
+  bool get canTranscribe => primary.canTranscribe || backup.canTranscribe;
+
+  @override
+  Future<List<NoteDraft>> notesFromImage(Attachment image) =>
+      _runIf((l) => l.canReadImages, (l) => l.notesFromImage(image));
+
+  @override
+  Future<List<NoteDraft>> notesFromText(String text) =>
+      _run((l) => l.notesFromText(text));
+
+  @override
+  Future<String> transcribe(Attachment audio) =>
+      _runIf((l) => l.canTranscribe, (l) => l.transcribe(audio));
 
   @override
   Future<String> expandNote(KnowledgeItem item) =>

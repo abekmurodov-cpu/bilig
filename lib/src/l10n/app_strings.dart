@@ -332,6 +332,81 @@ class AppStrings {
         'Заполните пропуск в уме, затем откройте ответ и оцените себя.',
       );
 
+  // --- Faster capture: photo, paste & split, voice, sharing -------------
+  String get photoToNotes => _t('Photo → notes', 'Rasmdan qaydlar', 'Фото → заметки');
+  String get pasteAndSplit =>
+      _t('Paste & split', 'Joylash va bo‘lish', 'Вставить и разбить');
+  String get pasteHere => _t(
+        'Paste lecture notes, a summary or a list. Each line like “Term — meaning” or “Question? Answer” becomes a note.',
+        'Ma’ruza konspekti, xulosa yoki ro‘yxatni joylang. “Atama — ma’nosi” yoki “Savol? Javob” ko‘rinishidagi har bir qator qaydga aylanadi.',
+        'Вставьте конспект, краткое содержание или список. Каждая строка вида «Термин — значение» или «Вопрос? Ответ» станет заметкой.',
+      );
+  String get pasteFromClipboard => _t('Paste', 'Joylash', 'Вставить');
+  String get makeNotesAi =>
+      _t('Make notes with AI', 'AI bilan qaydlar yaratish', 'Сделать заметки с ИИ');
+  String get splitByLines => _t('Split by lines (no AI)',
+      'Qatorlarga bo‘lish (AIsiz)', 'Разбить по строкам (без ИИ)');
+  String get choosePhoto => _t('Choose a photo', 'Rasm tanlash', 'Выбрать фото');
+  String get anotherPhoto => _t('Another photo', 'Boshqa rasm', 'Другое фото');
+  String get readingPhoto =>
+      _t('Reading the photo…', 'Rasm o‘qilmoqda…', 'Читаю фото…');
+  String get makingNotes =>
+      _t('Making notes…', 'Qaydlar tayyorlanmoqda…', 'Готовлю заметки…');
+  String get needVisionAi => _t(
+        'To read photos, connect an AI that sees images (Gemini, ChatGPT, Claude, Groq…) in Settings.',
+        'Rasmlarni o‘qish uchun Sozlamalarda rasmni ko‘ra oladigan AI ulang (Gemini, ChatGPT, Claude, Groq…).',
+        'Чтобы читать фото, подключите в настройках ИИ, который видит изображения (Gemini, ChatGPT, Claude, Groq…).',
+      );
+  String notesFound(int n) => _t(
+        '$n ${n == 1 ? 'note' : 'notes'} found. Untick any you don’t want; tap one to edit it.',
+        '$n ta qayd topildi. Keraksizlaridan belgini olib tashlang; tahrirlash uchun bosing.',
+        'Найдено заметок: $n. Снимите галочку с ненужных; нажмите, чтобы изменить.',
+      );
+  String get noNotesFound => _t('No notes found in it. Try another photo or text.',
+      'Undan qayd topilmadi. Boshqa rasm yoki matn bilan urinib ko‘ring.',
+      'Заметок не найдено. Попробуйте другое фото или текст.');
+  String get categoryForAll => _t('Category for all (optional)',
+      'Hammasi uchun turkum (ixtiyoriy)', 'Категория для всех (необязательно)');
+  String saveNotes(int n) => _t(n == 1 ? 'Save 1 note' : 'Save $n notes',
+      '$n ta qaydni saqlash', 'Сохранить: $n');
+  String savedNotes(int n) => _t(n == 1 ? 'Saved 1 note.' : 'Saved $n notes.',
+      '$n ta qayd saqlandi.', 'Сохранено заметок: $n.');
+  String get startOver => _t('Start over', 'Qaytadan', 'Заново');
+  String get speak => _t('Speak', 'Gapirish', 'Сказать');
+  String get voiceDevice => _t('This device', 'Qurilma', 'Устройство');
+  String get voiceAi => _t('AI (better for Uzbek)', 'AI (o‘zbekchaga yaxshi)',
+      'ИИ (лучше для узбекского)');
+  String get voiceLanguage => _t('Language', 'Til', 'Язык');
+  String get tapToSpeak =>
+      _t('Tap the mic and speak', 'Mikrofonni bosing va gapiring', 'Нажмите на микрофон и говорите');
+  String get listening => _t('Listening…', 'Tinglanmoqda…', 'Слушаю…');
+  String recordingFor(int s) {
+    final time = '${s ~/ 60}:${(s % 60).toString().padLeft(2, '0')}';
+    return _t('Recording… $time  ·  tap to stop',
+        'Yozilmoqda… $time  ·  to‘xtatish uchun bosing',
+        'Запись… $time  ·  нажмите, чтобы остановить');
+  }
+  String get writingItDown =>
+      _t('Writing it down…', 'Matnga aylantirilmoqda…', 'Записываю текстом…');
+  String get voiceTextHint => _t('What you say appears here. You can fix it before inserting.',
+      'Aytganlaringiz shu yerda chiqadi. Qo‘shishdan oldin tuzatishingiz mumkin.',
+      'Сказанное появится здесь. Можно поправить перед вставкой.');
+  String get insertText => _t('Insert', 'Qo‘shish', 'Вставить');
+  String get speechUnavailable => _t(
+        'Speech recognition isn’t available here, or permission was refused.',
+        'Bu yerda nutqni aniqlash mavjud emas yoki ruxsat berilmagan.',
+        'Распознавание речи здесь недоступно или не разрешено.',
+      );
+  String get tryAiVoice => _t('Try “AI” instead.', '“AI”ni sinab ko‘ring.',
+      'Попробуйте «ИИ».');
+  String get micDenied => _t(
+        'Bilig can’t use the microphone. Allow it in your system’s privacy settings.',
+        'Bilig mikrofondan foydalana olmaydi. Tizimning maxfiylik sozlamalarida ruxsat bering.',
+        'Bilig не может использовать микрофон. Разрешите это в настройках конфиденциальности.',
+      );
+  String get nothingHeard => _t('Nothing was heard. Try again.',
+      'Hech narsa eshitilmadi. Yana urinib ko‘ring.', 'Ничего не услышано. Попробуйте ещё раз.');
+
   // --- Note questions & highlights ---------------------------------------
   String questionsTitle(int n) =>
       _t('Questions ($n)', 'Savollar ($n)', 'Вопросы ($n)');

@@ -25,17 +25,19 @@ abstract class HttpLlm extends PromptedLlm {
 
   static const Duration requestTimeout = Duration(seconds: 60);
 
-  /// Sends one prompt, without retrying.
-  Future<String> send(String prompt, {required bool json});
+  /// Sends one prompt (with any [attachments]), without retrying.
+  Future<String> send(String prompt,
+      {required bool json, List<Attachment> attachments = const []});
 
   /// Model ids the key can use, as reported by the service.
   Future<List<String>> listModels();
 
   @override
-  Future<String> complete(String prompt, {bool json = false}) async {
+  Future<String> complete(String prompt,
+      {bool json = false, List<Attachment> attachments = const []}) async {
     for (var attempt = 0;; attempt++) {
       try {
-        return await send(prompt, json: json);
+        return await send(prompt, json: json, attachments: attachments);
       } on LlmException catch (e) {
         final transient = e.kind == LlmErrorKind.rateLimited ||
             (e.kind == LlmErrorKind.other && e.retryAfter != null);
