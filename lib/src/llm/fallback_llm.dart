@@ -72,4 +72,8 @@ class FallbackLlm implements LlmProvider {
   @override
   Future<String> suggestCategory(String front, String? back) =>
       _run((llm) => llm.suggestCategory(front, back));
+
+  @override
+  Future<List<String>> suggestHighlights(KnowledgeItem item) =>
+      _run((llm) => llm.suggestHighlights(item));
 }

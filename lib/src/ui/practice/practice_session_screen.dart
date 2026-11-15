@@ -10,6 +10,7 @@ import '../../llm/llm_providers.dart';
 import '../../llm/quiz_prep.dart';
 import '../../models/knowledge_item.dart';
 import '../../practice/answer_matching.dart';
+import '../../practice/cloze.dart';
 import '../../practice/code_drills.dart';
 import '../../practice/practice_models.dart';
 import '../../providers/knowledge_providers.dart';
@@ -143,6 +144,22 @@ class _PracticeSessionScreenState
 
   KnowledgeItem get _item => _queue[_index];
 
+  /// A fill-in-the-blank question made from the note's highlights, used
+  /// when the note has no AI or own question yet (or no AI at all).
+  QuizVariant? _cloze;
+
+  /// The question this card asks: the note's active question, else a
+  /// fill-in-the-blank from its highlights.
+  QuizVariant? get _quiz => _item.activeQuiz ?? _cloze;
+
+  bool get _isCloze => _item.activeQuiz == null && _cloze != null;
+
+  /// What the card shows as the prompt.
+  String get _prompt {
+    final q = _quiz?.question;
+    return (q != null && q.trim().isNotEmpty) ? q : _item.front;
+  }
+
   void _setItem(KnowledgeItem updated) {
     if (!mounted) return;
     setState(() => _queue[_index] = updated);
@@ -153,6 +170,9 @@ class _PracticeSessionScreenState
   /// then builds the multiple-choice option set.
   Future<void> _prepareItem() async {
     _syncFromStore();
+    _cloze = _usesQuiz && _item.activeQuiz == null
+        ? clozeQuiz(_item, ref.read(notesSortedProvider))
+        : null;
     setState(() {
       _preparing = true;
       _selfCheck = false;
@@ -233,12 +253,14 @@ class _PracticeSessionScreenState
   void _buildOptions() {
     final String correct;
     final List<String> distractors;
-    final quiz = _item.activeQuiz;
-    if (quiz != null && quiz.distractors.isNotEmpty) {
+    final quiz = _quiz;
+    // A fill-in-the-blank needs two wrong options to be a fair choice.
+    if (quiz != null && quiz.distractors.length >= (_isCloze ? 2 : 1)) {
       correct = quiz.answer;
       distractors = quiz.distractors;
     } else if (quiz != null) {
-      // The student's own question without wrong options.
+      // The student's own question without wrong options, or a
+      // fill-in-the-blank without enough of them.
       setState(() => _selfCheck = true);
       return;
     } else {
@@ -294,7 +316,7 @@ class _PracticeSessionScreenState
   /// reworded AI question, the matching answer is that question's concise
   /// answer; otherwise prefer the note's own detailed [back].
   String? get _revealAnswer {
-    final quiz = _item.activeQuiz;
+    final quiz = _quiz;
     final reworded = quiz?.question?.trim().isNotEmpty ?? false;
     return reworded ? quiz!.answer : (_item.back ?? quiz?.answer);
   }
@@ -397,7 +419,8 @@ class _PracticeSessionScreenState
         _usesQuiz &&
         prep.isPaused &&
         ref.watch(llmProvider) != null &&
-        _item.needsQuiz;
+        _item.needsQuiz &&
+        !_isCloze;
     return Scaffold(
       appBar: AppBar(
         title: Text(done
@@ -429,9 +452,11 @@ class _PracticeSessionScreenState
       return _buildSelfCheck(
         widget.config.method == PracticeMethod.typeAnswer
             ? context.s.noAnswerToCheck
-            : _item.activeQuiz?.manual ?? false
-                ? context.s.ownQuestionSelfCheck
-                : context.s.noAiQuestion,
+            : _isCloze
+                ? context.s.clozeSelfCheck
+                : _item.activeQuiz?.manual ?? false
+                    ? context.s.ownQuestionSelfCheck
+                    : context.s.noAiQuestion,
       );
     }
     return switch (widget.config.method) {
@@ -462,7 +487,7 @@ class _PracticeSessionScreenState
                 style: theme.textTheme.labelSmall
                     ?.copyWith(letterSpacing: 1.2)),
             const SizedBox(height: 12),
-            Text(_item.practicePrompt, style: theme.textTheme.headlineSmall),
+            Text(_prompt, style: theme.textTheme.headlineSmall),
             if (_item.hasImage) ...[
               const SizedBox(height: 12),
               NoteImage(noteId: _item.id),
@@ -598,7 +623,7 @@ class _PracticeSessionScreenState
                       },
                       front: _cardFace(
                         context.s.noteType(_item.type).toUpperCase(),
-                        _item.practicePrompt,
+                        _prompt,
                         withImage: _item.hasImage,
                       ),
                       back: _cardFace(
@@ -778,8 +803,10 @@ class _PracticeSessionScreenState
       await _submitObjective(true);
       return;
     }
-    final llm = _gradingLlm;
-    final aiAttached = ref.read(llmProvider) != null;
+    // A blank's answer is the exact highlighted words, checked on the device
+    // (the AI's grading prompt is about the note's own question).
+    final llm = _isCloze ? null : _gradingLlm;
+    final aiAttached = !_isCloze && ref.read(llmProvider) != null;
     setState(() => _grading = true);
     bool correct;
     String? feedback;

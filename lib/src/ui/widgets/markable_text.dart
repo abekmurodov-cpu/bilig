@@ -102,32 +102,77 @@ class _MarkableTextState extends State<MarkableText> {
     return SelectableText.rich(
       span,
       textAlign: widget.textAlign,
-      contextMenuBuilder: (context, state) {
-        final selection = state.textEditingValue.selection;
-        final items = [...state.contextMenuButtonItems];
-        if (!selection.isCollapsed) {
-          final range = (start: selection.start, end: selection.end);
-          final marked = highlightRanges(widget.text, widget.highlights)
-              .any((m) => m.start < range.end && range.start < m.end);
-          items.insert(
-            0,
-            ContextMenuButtonItem(
-              label: marked ? context.s.removeHighlight : context.s.highlight,
-              onPressed: () {
-                state.hideToolbar();
-                onChanged(marked
-                    ? removeAt(widget.text, widget.highlights, range)
-                    : addPhrase(widget.highlights,
-                        widget.text.substring(range.start, range.end)));
-              },
-            ),
-          );
-        }
-        return AdaptiveTextSelectionToolbar.buttonItems(
-          anchors: state.contextMenuAnchors,
-          buttonItems: items,
-        );
-      },
+      contextMenuBuilder: (context, state) => highlightContextMenu(
+        context,
+        state,
+        text: widget.text,
+        highlights: widget.highlights,
+        onChanged: onChanged,
+      ),
     );
+  }
+}
+
+/// The text selection menu with "Highlight" (or "Remove highlight" when the
+/// selection touches a marked phrase) added in front of copy/paste.
+Widget highlightContextMenu(
+  BuildContext context,
+  EditableTextState state, {
+  required String text,
+  required List<String> highlights,
+  required ValueChanged<List<String>> onChanged,
+}) {
+  final selection = state.textEditingValue.selection;
+  final items = [...state.contextMenuButtonItems];
+  if (selection.isValid && !selection.isCollapsed) {
+    final range = (start: selection.start, end: selection.end);
+    final marked = highlightRanges(text, highlights)
+        .any((m) => m.start < range.end && range.start < m.end);
+    items.insert(
+      0,
+      ContextMenuButtonItem(
+        label: marked ? context.s.removeHighlight : context.s.highlight,
+        onPressed: () {
+          state.hideToolbar();
+          onChanged(marked
+              ? removeAt(text, highlights, range)
+              : addPhrase(highlights, text.substring(range.start, range.end)));
+        },
+      ),
+    );
+  }
+  return AdaptiveTextSelectionToolbar.buttonItems(
+    anchors: state.contextMenuAnchors,
+    buttonItems: items,
+  );
+}
+
+/// A text field controller that paints [highlights] like a marker while the
+/// student types.
+class HighlightingController extends TextEditingController {
+  List<String> highlights = const [];
+
+  @override
+  TextSpan buildTextSpan({
+    required BuildContext context,
+    TextStyle? style,
+    required bool withComposing,
+  }) {
+    final marks = highlightRanges(text, highlights);
+    // Leave the keyboard's in-progress (composing) word drawing alone.
+    if (marks.isEmpty || (withComposing && value.isComposingRangeValid)) {
+      return super.buildTextSpan(
+          context: context, style: style, withComposing: withComposing);
+    }
+    final marked = TextStyle(backgroundColor: markerColor(context));
+    final children = <TextSpan>[];
+    var at = 0;
+    for (final m in marks) {
+      if (m.start > at) children.add(TextSpan(text: text.substring(at, m.start)));
+      children.add(TextSpan(text: text.substring(m.start, m.end), style: marked));
+      at = m.end;
+    }
+    if (at < text.length) children.add(TextSpan(text: text.substring(at)));
+    return TextSpan(style: style, children: children);
   }
 }

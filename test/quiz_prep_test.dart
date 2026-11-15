@@ -53,6 +53,9 @@ class FakeLlm implements LlmProvider {
   @override
   Future<String> suggestCategory(String front, String? back) =>
       throw UnimplementedError();
+  @override
+  Future<List<String>> suggestHighlights(KnowledgeItem item) =>
+      throw UnimplementedError();
 }
 
 KnowledgeItem note(String id) {

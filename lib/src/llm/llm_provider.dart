@@ -93,4 +93,8 @@ abstract class LlmProvider {
 
   /// Suggests a short category/tag for a freshly captured note.
   Future<String> suggestCategory(String front, String? back);
+
+  /// Picks the few key words or ideas in [item] worth highlighting, copied
+  /// exactly from the note's text.
+  Future<List<String>> suggestHighlights(KnowledgeItem item);
 }

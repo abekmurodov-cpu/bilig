@@ -42,6 +42,7 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
     String? quizQuestion,
     String? mcAnswer,
     List<String> mcDistractors = const [],
+    List<String> highlights = const [],
   }) async {
     final now = DateTime.now();
     final id = _uuid.v4();
@@ -71,6 +72,7 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
       fillBlankTemplate: drills?.fillBlankTemplate,
       fillBlankAnswers: drills?.fillBlankAnswers ?? const [],
       reorderSegments: drills?.reorderSegments ?? const [],
+      highlights: keptHighlights(highlights, front.trim(), back?.trim()),
     );
     await _repo.save(item);
     await _refresh();

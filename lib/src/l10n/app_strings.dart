@@ -326,6 +326,12 @@ class AppStrings {
         'У вашего вопроса нет неверных вариантов. Откройте ответ и оцените себя.',
       );
 
+  String get clozeSelfCheck => _t(
+        'Fill in the blank in your head, then reveal the answer and grade yourself.',
+        'Bo‘sh joyni xayolan to‘ldiring, so‘ng javobni ochib, o‘zingizni baholang.',
+        'Заполните пропуск в уме, затем откройте ответ и оцените себя.',
+      );
+
   // --- Note questions & highlights ---------------------------------------
   String questionsTitle(int n) =>
       _t('Questions ($n)', 'Savollar ($n)', 'Вопросы ($n)');
@@ -383,6 +389,21 @@ class AppStrings {
         'Tap the key words and ideas. Questions will focus on them.',
         'Asosiy so‘z va fikrlarni bosing. Savollar ularga qaratiladi.',
         'Нажимайте на главные слова и идеи. Вопросы будут о них.',
+      );
+  String get suggestKeyIdeas =>
+      _t('Suggest key ideas', 'Asosiy fikrlarni taklif qilish', 'Предложить главное');
+  String keyIdeasSuggested(int n) => _t(
+        'Marked $n suggested key ${n == 1 ? 'idea' : 'ideas'}. Tap any to remove it, then press Done.',
+        '$n ta taklif qilingan asosiy fikr belgilandi. Keraksizini bosib olib tashlang, so‘ng «Tayyor»ni bosing.',
+        'Отмечено предложенного: $n. Нажмите на лишнее, чтобы убрать, затем «Готово».',
+      );
+  String get noNewKeyIdeas => _t('The AI found no new key ideas to mark.',
+      'AI belgilash uchun yangi asosiy fikr topmadi.',
+      'ИИ не нашёл нового главного для выделения.');
+  String get captureMarkerHint => _t(
+        'Mark key ideas: select words, then choose Highlight. Questions will focus on them.',
+        'Asosiy fikrlarni belgilang: so‘zlarni tanlang va «Belgilash»ni bosing. Savollar ularga qaratiladi.',
+        'Отметьте главное: выделите слова и выберите «Выделить». Вопросы будут о них.',
       );
   String get highlight => _t('Highlight', 'Belgilash', 'Выделить');
   String get removeHighlight =>

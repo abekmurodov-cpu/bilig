@@ -7,6 +7,7 @@ import '../../llm/llm_providers.dart';
 import '../../llm/quiz_prep.dart';
 import '../../models/knowledge_item.dart';
 import '../../providers/knowledge_providers.dart';
+import '../../models/highlights.dart';
 import 'image_picking.dart';
 import 'item_tile.dart';
 import 'markable_text.dart';
@@ -113,6 +114,45 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
     }
   }
 
+  bool _suggesting = false;
+
+  /// Asks the AI for the note's key ideas and marks them in the draft; the
+  /// student keeps or untaps them before "Done".
+  Future<void> _suggest(KnowledgeItem item) async {
+    final strings = context.s;
+    final llm = ref.read(llmProvider);
+    if (llm == null) return;
+    setState(() {
+      _suggesting = true;
+      _markMessage = null;
+    });
+    String message;
+    try {
+      final suggested = await llm.suggestHighlights(item);
+      var draft = _marking ?? [...item.highlights];
+      var added = 0;
+      for (final phrase in suggested) {
+        final next = addPhrase(draft, phrase);
+        if (next.length > KnowledgeItem.maxHighlights) break;
+        if (!_same(next, draft)) added++;
+        draft = next;
+      }
+      if (mounted) setState(() => _marking = draft);
+      message = added == 0 ? strings.noNewKeyIdeas : strings.keyIdeasSuggested(added);
+    } on LlmException catch (e) {
+      if (mounted) ref.read(quizPrepProvider.notifier).reportError(e);
+      message = strings.aiFailure(e.kind, e.message);
+    } catch (_) {
+      message = strings.noNewKeyIdeas;
+    }
+    if (mounted) {
+      setState(() {
+        _suggesting = false;
+        _markMessage = message;
+      });
+    }
+  }
+
   Future<void> _toggleMarker(KnowledgeItem item) async {
     final pending = _marking;
     if (pending == null) {
@@ -209,7 +249,13 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
           ],
         ),
         if (marking != null)
-          _MarkerBar(onDone: () => _toggleMarker(item))
+          _MarkerBar(
+            onDone: () => _toggleMarker(item),
+            onSuggest: ref.watch(llmProvider) == null || _suggesting
+                ? null
+                : () => _suggest(item),
+            suggesting: _suggesting,
+          )
         else
           const SizedBox(height: 8),
         if (_markMessage != null) ...[
@@ -331,9 +377,13 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
 
 /// Shown while the marker is on: what to do, and "Done".
 class _MarkerBar extends StatelessWidget {
-  const _MarkerBar({required this.onDone});
+  const _MarkerBar({required this.onDone, this.onSuggest, this.suggesting = false});
 
   final VoidCallback onDone;
+
+  /// Null hides the button (no AI) unless [suggesting].
+  final VoidCallback? onSuggest;
+  final bool suggesting;
 
   @override
   Widget build(BuildContext context) {
@@ -345,13 +395,37 @@ class _MarkerBar extends StatelessWidget {
         color: markerColor(context).withValues(alpha: 0.35),
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          const Icon(Icons.border_color, size: 18),
-          const SizedBox(width: 8),
-          Expanded(
-              child: Text(context.s.markerHint, style: theme.textTheme.bodySmall)),
-          TextButton(onPressed: onDone, child: Text(context.s.done)),
+          Row(
+            children: [
+              const Icon(Icons.border_color, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                  child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(context.s.markerHint, style: theme.textTheme.bodySmall),
+              )),
+            ],
+          ),
+          Wrap(
+            spacing: 4,
+            children: [
+              if (onSuggest != null || suggesting)
+                TextButton.icon(
+                  onPressed: onSuggest,
+                  icon: suggesting
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.auto_awesome, size: 18),
+                  label: Text(context.s.suggestKeyIdeas),
+                ),
+              FilledButton.tonal(onPressed: onDone, child: Text(context.s.done)),
+            ],
+          ),
         ],
       ),
     );

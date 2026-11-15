@@ -227,6 +227,44 @@ abstract class PromptedLlm implements LlmProvider {
         LlmErrorKind.badResponse, 'The AI returned an unusable grade');
   }
 
+  /// Most key ideas suggested at once: a few strong marks beat many weak ones.
+  static const int maxSuggestedHighlights = 4;
+
+  @override
+  Future<List<String>> suggestHighlights(KnowledgeItem item) async {
+    final raw = await complete(
+      'A student is studying this note. Pick the 2-$maxSuggestedHighlights most '
+      'important key terms or short key phrases (1-4 words each) worth '
+      'highlighting for revision: the ideas an exam would ask about, not '
+      'filler words. Copy each one EXACTLY as it appears in the note text.\n'
+      'Return JSON: {"highlights": ["...", "..."]}.\n\n'
+      'Note: ${_clip(item.front)}'
+      '${item.hasAnswer ? '\n${_clip(item.back!)}' : ''}',
+      json: true,
+    );
+    final decoded = decodeJsonLoose(raw);
+    final list = decoded is Map ? decoded['highlights'] : decoded;
+    if (list is! List) {
+      throw const LlmException(
+          LlmErrorKind.badResponse, 'The AI returned no key ideas');
+    }
+    return parseHighlights(item, [for (final h in list) '$h']);
+  }
+
+  /// Keeps the suggestions that really occur in the note (models sometimes
+  /// paraphrase), trimmed, without repeats, at most [maxSuggestedHighlights].
+  static List<String> parseHighlights(KnowledgeItem item, List<String> raw) {
+    final text = '${item.front}\n${item.back ?? ''}'.toLowerCase();
+    final out = <String>[];
+    for (final h in raw) {
+      final phrase = h.trim().replaceAll(RegExp(r"""^["'«“]+|["'»”.,;:]+$"""), '');
+      if (phrase.isEmpty || !text.contains(phrase.toLowerCase())) continue;
+      if (out.any((o) => o.toLowerCase() == phrase.toLowerCase())) continue;
+      out.add(phrase);
+    }
+    return out.take(maxSuggestedHighlights).toList();
+  }
+
   /// Decodes JSON that may be wrapped in a code fence or surrounded by prose.
   /// Returns null when nothing parseable is found.
   static Object? decodeJsonLoose(String raw) {

@@ -5,9 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../l10n/app_strings.dart';
 import '../llm/llm_providers.dart';
+import '../models/highlights.dart';
 import '../models/knowledge_item.dart';
 import '../providers/knowledge_providers.dart';
 import 'widgets/image_picking.dart';
+import 'widgets/markable_text.dart';
 
 class CaptureScreen extends ConsumerStatefulWidget {
   const CaptureScreen({super.key});
@@ -18,13 +20,69 @@ class CaptureScreen extends ConsumerStatefulWidget {
 
 class _CaptureScreenState extends ConsumerState<CaptureScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _frontController = TextEditingController();
-  final _backController = TextEditingController();
+  final _frontController = HighlightingController();
+  final _backController = HighlightingController();
   final _categoryController = TextEditingController();
   KnowledgeType _type = KnowledgeType.concept;
   bool _saving = false;
   bool _aiBusy = false;
   Uint8List? _imageBytes;
+
+  /// Key ideas marked while writing (select text → Highlight).
+  List<String> _highlights = const [];
+
+  void _setHighlights(List<String> highlights) {
+    if (highlights.length > KnowledgeItem.maxHighlights) {
+      _showError(context.s.tooManyHighlights);
+      return;
+    }
+    setState(() {
+      _highlights = highlights;
+      _frontController.highlights = highlights;
+      _backController.highlights = highlights;
+    });
+  }
+
+  KnowledgeItem _draft() {
+    final now = DateTime.now();
+    final back = _backController.text.trim();
+    return KnowledgeItem(
+      id: '',
+      front: _frontController.text.trim(),
+      back: back.isEmpty ? null : back,
+      type: _type,
+      createdAt: now,
+      dueDate: now,
+    );
+  }
+
+  Future<void> _suggestKeyIdeas() async {
+    final strings = context.s;
+    final llm = ref.read(llmProvider);
+    if (llm == null || _frontController.text.trim().isEmpty) return;
+    setState(() => _aiBusy = true);
+    try {
+      final suggested = await llm.suggestHighlights(_draft());
+      var next = _highlights;
+      for (final phrase in suggested) {
+        final grown = addPhrase(next, phrase);
+        if (grown.length > KnowledgeItem.maxHighlights) break;
+        next = grown;
+      }
+      if (!mounted) return;
+      if (next.length == _highlights.length) _showError(strings.noNewKeyIdeas);
+      _setHighlights(next);
+    } catch (e) {
+      _showError(strings.couldNotSuggest(e));
+    } finally {
+      if (mounted) setState(() => _aiBusy = false);
+    }
+  }
+
+  Widget _highlightMenu(
+          BuildContext context, EditableTextState state, TextEditingController c) =>
+      highlightContextMenu(context, state,
+          text: c.text, highlights: _highlights, onChanged: _setHighlights);
 
   @override
   void dispose() {
@@ -97,6 +155,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
           type: _type,
           category: _categoryController.text,
           imageBytes: _imageBytes,
+          highlights: _highlights,
         );
     if (mounted) Navigator.of(context).pop();
   }
@@ -137,6 +196,8 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
               minLines: 1,
               maxLines: 4,
               textCapitalization: TextCapitalization.sentences,
+              contextMenuBuilder: (context, state) =>
+                  _highlightMenu(context, state, _frontController),
               decoration: InputDecoration(
                 labelText: context.s.prompt,
                 hintText:
@@ -152,6 +213,8 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
               minLines: 2,
               maxLines: 8,
               textCapitalization: TextCapitalization.sentences,
+              contextMenuBuilder: (context, state) =>
+                  _highlightMenu(context, state, _backController),
               decoration: InputDecoration(
                 labelText: context.s.answerOptional,
                 hintText: context.s.answerHint,
@@ -174,6 +237,13 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                 ),
               ),
             ],
+            const SizedBox(height: 8),
+            _KeyIdeas(
+              highlights: _highlights,
+              onRemove: (h) =>
+                  _setHighlights([for (final x in _highlights) if (x != h) x]),
+              onSuggest: aiAttached && !_aiBusy ? _suggestKeyIdeas : null,
+            ),
             const SizedBox(height: 16),
             Row(
               children: [
@@ -236,6 +306,69 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// The marked key ideas while writing a note, with how to mark them and the
+/// AI's suggestions.
+class _KeyIdeas extends StatelessWidget {
+  const _KeyIdeas({required this.highlights, required this.onRemove, this.onSuggest});
+
+  final List<String> highlights;
+  final ValueChanged<String> onRemove;
+  final VoidCallback? onSuggest;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+      decoration: BoxDecoration(
+        color: markerColor(context).withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.border_color, size: 18, color: Colors.amber.shade800),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(context.s.captureMarkerHint,
+                    style: theme.textTheme.bodySmall),
+              ),
+            ],
+          ),
+          if (highlights.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                for (final h in highlights)
+                  InputChip(
+                    label: Text(h),
+                    backgroundColor: markerColor(context),
+                    side: BorderSide.none,
+                    visualDensity: VisualDensity.compact,
+                    onDeleted: () => onRemove(h),
+                  ),
+              ],
+            ),
+          ],
+          if (onSuggest != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: onSuggest,
+                icon: const Icon(Icons.auto_awesome, size: 18),
+                label: Text(context.s.suggestKeyIdeas),
+              ),
+            ),
+        ],
       ),
     );
   }
