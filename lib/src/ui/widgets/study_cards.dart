@@ -261,7 +261,7 @@ class _ExamDialogState extends ConsumerState<_ExamDialog> {
             initialValue: _category,
             isExpanded: true,
             decoration: InputDecoration(
-                labelText: strings.category, border: const OutlineInputBorder()),
+                labelText: strings.category),
             items: [
               for (final c in widget.categories)
                 DropdownMenuItem(value: c, child: Text(c)),

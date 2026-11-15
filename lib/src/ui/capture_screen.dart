@@ -10,6 +10,7 @@ import '../models/knowledge_item.dart';
 import '../providers/knowledge_providers.dart';
 import 'bulk_add_screen.dart';
 import 'widgets/image_picking.dart';
+import 'widgets/category_field.dart';
 import 'widgets/markable_text.dart';
 import 'widgets/voice_input.dart';
 
@@ -243,7 +244,6 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                 labelText: context.s.prompt,
                 hintText:
                     context.s.promptHint,
-                border: OutlineInputBorder(),
                 suffixIcon: VoiceButton(controller: _frontController),
               ),
               validator: (v) =>
@@ -260,7 +260,6 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
               decoration: InputDecoration(
                 labelText: context.s.answerOptional,
                 hintText: context.s.answerHint,
-                border: OutlineInputBorder(),
                 suffixIcon: VoiceButton(controller: _backController),
               ),
             ),
@@ -288,25 +287,18 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
               onSuggest: aiAttached && !_aiBusy ? _suggestKeyIdeas : null,
             ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _categoryController,
-                    decoration: InputDecoration(
-                      labelText: context.s.categoryOptional,
-                      hintText: 'e.g. Math, ML, Linux, Cybersec',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ),
-                if (aiAttached)
-                  IconButton(
-                    tooltip: context.s.suggestCategory,
-                    onPressed: _aiBusy ? null : _suggestCategory,
-                    icon: const Icon(Icons.auto_awesome),
-                  ),
-              ],
+            CategoryField(
+              controller: _categoryController,
+              trailing: aiAttached
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: IconButton(
+                        tooltip: context.s.suggestCategory,
+                        onPressed: _aiBusy ? null : _suggestCategory,
+                        icon: const Icon(Icons.auto_awesome),
+                      ),
+                    )
+                  : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -315,7 +307,6 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                 labelText: context.s.tagsField,
                 hintText: context.s.tagsHint,
                 prefixIcon: const Icon(Icons.sell_outlined),
-                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 16),

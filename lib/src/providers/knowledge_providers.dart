@@ -66,7 +66,7 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
       front: front.trim(),
       back: back?.trim().isEmpty ?? true ? null : back!.trim(),
       type: type,
-      category: category?.trim().isEmpty ?? true ? null : category!.trim(),
+      category: _existingCategory(category),
       createdAt: now,
       dueDate: now, // due immediately so it appears in the first review
       hasImage: imageBytes != null,
@@ -89,7 +89,7 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
   Future<void> addDrafts(List<NoteDraft> drafts,
       {String? category, bool onlyMissing = false}) async {
     final now = DateTime.now();
-    final typed = category?.trim().isEmpty ?? true ? null : category!.trim();
+    final typed = _existingCategory(category);
     for (final d in drafts) {
       final back = d.back?.trim();
       final code = d.type == KnowledgeType.code ? back ?? '' : '';
@@ -99,7 +99,9 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
         front: d.front.trim(),
         back: back == null || back.isEmpty ? null : back,
         type: d.type,
-        category: onlyMissing ? (d.category ?? typed) : (typed ?? d.category),
+        category: onlyMissing
+            ? (_existingCategory(d.category) ?? typed)
+            : (typed ?? _existingCategory(d.category)),
         createdAt: now,
         dueDate: now,
         fillBlankTemplate: drills?.fillBlankTemplate,
@@ -254,7 +256,7 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
       front: newFront,
       back: newBack,
       type: type,
-      category: category?.trim().isEmpty ?? true ? null : category!.trim(),
+      category: _existingCategory(category),
       highlights: keptHighlights(item.highlights, newFront, newBack),
       tags: tags,
       updatedAt: DateTime.now(),
@@ -278,6 +280,20 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
     await _repo.delete(id);
     await _images.delete(id);
     await _refresh();
+  }
+
+  /// [typed] as a category: blank is none, and a name that only differs in
+  /// case or spacing from one in use ("biology " for "Biology") is that one,
+  /// so a category isn't split in two by a typo.
+  String? _existingCategory(String? typed) {
+    final name = typed?.trim().replaceAll(RegExp(r'\s+'), ' ') ?? '';
+    if (name.isEmpty) return null;
+    final key = name.toLowerCase();
+    for (final item in state.asData?.value ?? const <KnowledgeItem>[]) {
+      final c = item.category?.trim();
+      if (c != null && c.toLowerCase() == key) return c;
+    }
+    return name;
   }
 
   Future<void> _refresh() async {
@@ -347,6 +363,27 @@ final tagsProvider = Provider<List<(String, int)>>((ref) {
   }
   final out = [for (final e in counts.entries) (names[e.key]!, e.value)]
     ..sort((a, b) => b.$2 != a.$2 ? b.$2 - a.$2 : a.$1.compareTo(b.$1));
+  return out;
+});
+
+/// A category in use: its name, how many notes it has and when one was last
+/// added to it.
+typedef CategoryInfo = ({String name, int count, DateTime lastUsed});
+
+/// Every category, the most recently used first: the choices offered while
+/// writing a note.
+final categoryInfoProvider = Provider<List<CategoryInfo>>((ref) {
+  final out = [
+    for (final e in ref.watch(notesByCategoryProvider).entries)
+      if (e.key != kUngroupedCategory)
+        (
+          name: e.key,
+          count: e.value.length,
+          lastUsed: e.value
+              .map((n) => n.createdAt)
+              .reduce((a, b) => a.isAfter(b) ? a : b),
+        ),
+  ]..sort((a, b) => b.lastUsed.compareTo(a.lastUsed));
   return out;
 });
 

@@ -14,13 +14,17 @@ import '../../practice/answer_matching.dart';
 import '../../practice/cloze.dart';
 import '../../practice/code_drills.dart';
 import '../../practice/practice_models.dart';
+import '../../practice/text_blanks.dart';
 import '../../providers/knowledge_providers.dart';
 import '../../scheduler/spaced_repetition.dart';
 import '../widgets/code_field.dart';
 import '../widgets/code_highlighter.dart';
 import '../widgets/flip_card.dart';
 import '../widgets/markable_text.dart';
+import '../theme.dart';
+import '../widgets/item_tile.dart';
 import '../widgets/note_image.dart';
+import 'practice_screen.dart' show methodIcon;
 
 const TextStyle _monoStyle = TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.4);
 
@@ -78,6 +82,9 @@ class _PracticeSessionScreenState
   final _codeController = CodeEditingController();
   // Fill-in-the-blank: one controller per blank.
   final List<TextEditingController> _blankControllers = [];
+  // Fill-in-the-blank on an ordinary note (key words taken out of its text);
+  // null for code notes, which blank code tokens instead.
+  TextBlanks? _textBlanks;
   // Reorder: current arrangement as indices into the note's reorderSegments.
   List<int> _reorderCurrent = [];
   // Shared "answered" result for objective modes.
@@ -201,8 +208,12 @@ class _PracticeSessionScreenState
         break;
       case PracticeMethod.typeAnswer:
         _selfCheck = !_canReveal;
+      case PracticeMethod.fillBlank when _item.type != KnowledgeType.code:
+        _textBlanks = textBlanks(_item);
+        _setupCoding();
       case PracticeMethod.fillBlank:
       case PracticeMethod.reorder:
+        _textBlanks = null;
         await _ensureDrills();
         _setupCoding();
       case PracticeMethod.codeSnippet:
@@ -234,10 +245,17 @@ class _PracticeSessionScreenState
   void _setupCoding() {
     _disposeBlankControllers();
     _blankControllers.addAll(
-      List.generate(_item.fillBlankAnswers.length, (_) => TextEditingController()),
+      List.generate(_blankAnswers.length, (_) => TextEditingController()),
     );
     _reorderCurrent = _shuffledOrder(_item.reorderSegments.length);
   }
+
+  /// The blanks' answers: key words of an ordinary note, or code tokens.
+  List<String> get _blankAnswers => _textBlanks?.answers ?? _item.fillBlankAnswers;
+
+  bool _blankRight(int i) => _textBlanks != null
+      ? blankMatches(_blankControllers[i].text, _blankAnswers[i])
+      : _blankControllers[i].text.trim() == _blankAnswers[i].trim();
 
   /// A shuffled index order [0..n) that differs from the sorted answer order.
   List<int> _shuffledOrder(int n) {
@@ -479,9 +497,39 @@ class _PracticeSessionScreenState
         !_isCloze;
     return Scaffold(
       appBar: AppBar(
-        title: Text(done
-            ? context.s.done
-            : '${context.s.methodLabel(widget.config.method)}  ${_index + 1}/${_queue.length}'),
+        titleSpacing: 0,
+        title: done
+            ? Text(context.s.done)
+            : Row(
+                children: [
+                  Icon(methodIcon(widget.config.method),
+                      size: 22, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 10),
+                  Flexible(
+                    child: Text(context.s.methodLabel(widget.config.method),
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleLarge),
+                  ),
+                  const SizedBox(width: 10),
+                  Text('${_index + 1} / ${_queue.length}',
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                ],
+              ),
+        bottom: done
+            ? null
+            : PreferredSize(
+                preferredSize: const Size.fromHeight(10),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(end: _queue.isEmpty ? 0 : _index / _queue.length),
+                    duration: const Duration(milliseconds: 300),
+                    builder: (context, value, _) =>
+                        LinearProgressIndicator(value: value),
+                  ),
+                ),
+              ),
         actions: [
           if (_history.isNotEmpty)
             IconButton(
@@ -617,18 +665,13 @@ class _PracticeSessionScreenState
       width: double.infinity,
       margin: const EdgeInsets.all(16),
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(20),
-      ),
+      decoration: practiceCardDecoration(context),
       child: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(context.s.noteType(_item.type).toUpperCase(),
-                style: theme.textTheme.labelSmall
-                    ?.copyWith(letterSpacing: 1.2)),
-            const SizedBox(height: 12),
+            _cardLabel(context),
+            const SizedBox(height: 14),
             Text(_prompt, style: theme.textTheme.headlineSmall),
             if (_item.hasImage) ...[
               const SizedBox(height: 12),
@@ -638,6 +681,27 @@ class _PracticeSessionScreenState
           ],
         ),
       ),
+    );
+  }
+
+  /// The note's kind and category, over the question.
+  Widget _cardLabel(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.labelMedium
+        ?.copyWith(color: theme.colorScheme.onSurfaceVariant, letterSpacing: 0.4);
+    return Row(
+      children: [
+        TypeChip(type: _item.type, size: 28),
+        const SizedBox(width: 10),
+        Text(context.s.noteType(_item.type), style: muted),
+        if (_item.category != null) ...[
+          Text('  ·  ', style: muted),
+          Flexible(
+            child: Text(_item.category!,
+                maxLines: 1, overflow: TextOverflow.ellipsis, style: muted),
+          ),
+        ],
+      ],
     );
   }
 
@@ -878,8 +942,9 @@ class _PracticeSessionScreenState
               : ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   children: [
-                    for (final option in _options!)
+                    for (final (i, option) in _options!.indexed)
                       _OptionTile(
+                        letter: String.fromCharCode(65 + i),
                         text: option,
                         correctAnswer: _correctOption ?? '',
                         chosen: _chosen,
@@ -920,7 +985,6 @@ class _PracticeSessionScreenState
                     maxLines: 4,
                     decoration: InputDecoration(
                       labelText: context.s.yourAnswer,
-                      border: OutlineInputBorder(),
                     ),
                     onSubmitted: answered ? null : (_) => _checkTyped(),
                   ),
@@ -1004,6 +1068,7 @@ class _PracticeSessionScreenState
   bool get _canExplain =>
       _wasCorrect == false &&
       !widget.config.method.isCoding &&
+      widget.config.method != PracticeMethod.fillBlank &&
       ref.read(llmProvider) != null &&
       (_revealAnswer ?? _correctOption) != null;
 
@@ -1068,7 +1133,7 @@ class _PracticeSessionScreenState
     );
   }
 
-  Widget _resultBanner() {
+  Widget _resultBanner({bool showAnswer = true}) {
     final correct = _wasCorrect == true;
     final color = _partial
         ? const Color(0xFFC98A00)
@@ -1104,8 +1169,10 @@ class _PracticeSessionScreenState
                         color: color, fontWeight: FontWeight.bold)),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(context.s.answerIs(_revealAnswer ?? _correctOption ?? '—')),
+            if (showAnswer) ...[
+              const SizedBox(height: 8),
+              Text(context.s.answerIs(_revealAnswer ?? _correctOption ?? '—')),
+            ],
             if (_feedback != null) ...[
               const SizedBox(height: 4),
               Text(_feedback!, style: const TextStyle(fontSize: 13)),
@@ -1215,6 +1282,8 @@ class _PracticeSessionScreenState
   // --- Fill in the blank (inline tap-to-type) -----------------------------
   Widget _buildFillBlank() {
     if (_preparing) return const Center(child: CircularProgressIndicator());
+    final text = _textBlanks;
+    if (text != null) return _buildTextBlanks(text);
     final answered = _wasCorrect != null;
     final template = _item.fillBlankTemplate ?? _item.back ?? '';
     final answers = _item.fillBlankAnswers;
@@ -1235,6 +1304,7 @@ class _PracticeSessionScreenState
             controller: _blankControllers[k],
             answer: answers[k],
             answered: answered,
+            correct: _blankRight(k),
           ),
         ));
       }
@@ -1271,13 +1341,96 @@ class _PracticeSessionScreenState
     );
   }
 
+  /// Fill in the blank on an ordinary note: its cue, then the passage with
+  /// the key words to type back in.
+  Widget _buildTextBlanks(TextBlanks blanks) {
+    final theme = Theme.of(context);
+    final answered = _wasCorrect != null;
+    final base = theme.textTheme.bodyLarge!.copyWith(fontSize: 18, height: 2);
+    final spans = <InlineSpan>[];
+    var cursor = 0;
+    for (final m in fillBlankPlaceholderPattern.allMatches(blanks.template)) {
+      if (m.start > cursor) {
+        spans.add(TextSpan(text: blanks.template.substring(cursor, m.start)));
+      }
+      final k = int.parse(m.group(1)!);
+      if (k < _blankControllers.length) {
+        spans.add(WidgetSpan(
+          alignment: PlaceholderAlignment.middle,
+          child: _InlineBlank(
+            controller: _blankControllers[k],
+            answer: blanks.answers[k],
+            answered: answered,
+            correct: _blankRight(k),
+            mono: false,
+            onSubmitted: k == _blankControllers.length - 1 && !answered
+                ? _checkBlanks
+                : null,
+          ),
+        ));
+      }
+      cursor = m.end;
+    }
+    if (cursor < blanks.template.length) {
+      spans.add(TextSpan(text: blanks.template.substring(cursor)));
+    }
+    return Column(
+      children: [
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              _codeTaskHeader(context.s.fillBlanksTitle, context.s.textBlanksSubtitle),
+              const SizedBox(height: 12),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(22),
+                decoration: practiceCardDecoration(context),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _cardLabel(context),
+                    const SizedBox(height: 14),
+                    if (blanks.cue != null) ...[
+                      Text(blanks.cue!,
+                          style: theme.textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w600)),
+                      if (_item.hasImage) ...[
+                        const SizedBox(height: 12),
+                        NoteImage(noteId: _item.id),
+                      ],
+                      const Divider(height: 28),
+                    ],
+                    Text.rich(TextSpan(style: base, children: spans)),
+                  ],
+                ),
+              ),
+              if (answered) _resultBanner(showAnswer: false),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+          child: SizedBox(
+            width: double.infinity,
+            child: answered
+                ? FilledButton(
+                    onPressed: _advance,
+                    child: Text(_index + 1 >= _queue.length
+                        ? context.s.finish
+                        : context.s.next))
+                : FilledButton(onPressed: _checkBlanks, child: Text(context.s.check)),
+          ),
+        ),
+      ],
+    );
+  }
+
   void _checkBlanks() {
-    final answers = _item.fillBlankAnswers;
+    final answers = _blankAnswers;
     var allCorrect = answers.isNotEmpty;
     for (var i = 0; i < answers.length; i++) {
-      if (_blankControllers[i].text.trim() != answers[i].trim()) {
-        allCorrect = false;
-      }
+      if (!_blankRight(i)) allCorrect = false;
     }
     _submitObjective(allCorrect);
   }
@@ -1416,22 +1569,88 @@ class _PracticeSessionScreenState
     );
   }
 
+  /// Notes missed this session, as they are now, for another go.
+  List<KnowledgeItem> get _missed {
+    final ids = {for (final h in _history) if (!h.counted) h.before.id};
+    final items = ref.read(knowledgeListProvider).asData?.value ?? const [];
+    return [for (final i in items) if (ids.contains(i.id)) i];
+  }
+
   Widget _buildDone() {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final total = widget.queue.length;
+    final share = total == 0 ? 0.0 : _correctCount / total;
+    final missed = _missed;
     return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.emoji_events_outlined,
-              size: 72, color: Theme.of(context).colorScheme.primary),
-          const SizedBox(height: 16),
-          Text(context.s.scored(_correctCount, widget.queue.length),
-              style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 24),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(context.s.back),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(32),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 360),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SizedBox(
+                width: 150,
+                height: 150,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0, end: share),
+                      duration: const Duration(milliseconds: 900),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, _) => CircularProgressIndicator(
+                        value: value,
+                        strokeWidth: 12,
+                        strokeCap: StrokeCap.round,
+                        backgroundColor: scheme.surfaceContainerHighest,
+                      ),
+                    ),
+                    Center(
+                      child: Text('${(share * 100).round()}%',
+                          style: theme.textTheme.headlineMedium),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(share >= 0.8 ? context.s.greatSession : context.s.sessionDone,
+                  style: theme.textTheme.headlineSmall, textAlign: TextAlign.center),
+              const SizedBox(height: 6),
+              Text(context.s.scored(_correctCount, total),
+                  style: theme.textTheme.bodyLarge
+                      ?.copyWith(color: scheme.onSurfaceVariant)),
+              const SizedBox(height: 28),
+              if (missed.isNotEmpty) ...[
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () => Navigator.of(context).pushReplacement(
+                      MaterialPageRoute(
+                        builder: (_) => PracticeSessionScreen(
+                            config: widget.config, queue: missed..shuffle()),
+                      ),
+                    ),
+                    icon: const Icon(Icons.replay),
+                    label: Text(context.s.practiseMissed(missed.length)),
+                  ),
+                ),
+                const SizedBox(height: 10),
+              ],
+              SizedBox(
+                width: double.infinity,
+                child: missed.isEmpty
+                    ? FilledButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Text(context.s.back))
+                    : OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: Text(context.s.back)),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1445,18 +1664,28 @@ class _InlineBlank extends StatelessWidget {
     required this.controller,
     required this.answer,
     required this.answered,
+    required this.correct,
+    this.mono = true,
+    this.onSubmitted,
   });
 
   final TextEditingController controller;
   final String answer;
   final bool answered;
 
+  /// Whether what was typed fills the blank (shown once answered).
+  final bool correct;
+
+  /// Code is typed in a monospace font; words in the note's own.
+  final bool mono;
+  final VoidCallback? onSubmitted;
+
   static const _mono = TextStyle(fontFamily: 'monospace', fontSize: 13);
 
   @override
   Widget build(BuildContext context) {
+    final style = mono ? _mono : Theme.of(context).textTheme.bodyLarge!.copyWith(fontSize: 17);
     if (answered) {
-      final correct = controller.text.trim() == answer.trim();
       final color =
           correct ? const Color(0xFF2E9E4F) : const Color(0xFFD64545);
       return Container(
@@ -1468,16 +1697,19 @@ class _InlineBlank extends StatelessWidget {
           border: Border.all(color: color),
         ),
         child: Text(answer,
-            style: _mono.copyWith(color: color, fontWeight: FontWeight.w600)),
+            style: style.copyWith(color: color, fontWeight: FontWeight.w600)),
       );
     }
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 2),
-      constraints: const BoxConstraints(minWidth: 48, maxWidth: 160),
+      constraints: BoxConstraints(minWidth: mono ? 48 : 72, maxWidth: mono ? 160 : 220),
       child: IntrinsicWidth(
         child: TextField(
           controller: controller,
-          style: _mono,
+          style: style,
+          onSubmitted: onSubmitted == null ? null : (_) => onSubmitted!(),
+          textInputAction:
+              onSubmitted == null ? TextInputAction.next : TextInputAction.done,
           textAlign: TextAlign.center,
           autocorrect: false,
           enableSuggestions: false,
@@ -1490,7 +1722,12 @@ class _InlineBlank extends StatelessWidget {
                 .colorScheme
                 .primaryContainer
                 .withValues(alpha: 0.4),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(mono ? 4 : 8)),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(mono ? 4 : 8),
+              borderSide: BorderSide(
+                  color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.5)),
+            ),
           ),
         ),
       ),
@@ -1500,6 +1737,7 @@ class _InlineBlank extends StatelessWidget {
 
 class _OptionTile extends StatelessWidget {
   const _OptionTile({
+    required this.letter,
     required this.text,
     required this.correctAnswer,
     required this.chosen,
@@ -1507,40 +1745,68 @@ class _OptionTile extends StatelessWidget {
     required this.onTap,
   });
 
+  /// A, B, C… (keys 1, 2, 3… pick them).
+  final String letter;
   final String text;
   final String correctAnswer;
   final String? chosen;
   final bool answered;
   final VoidCallback? onTap;
 
+  static const _right = Color(0xFF2E9E4F);
+  static const _wrong = Color(0xFFD64545);
+
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final isCorrect = text == correctAnswer;
     final isChosen = text == chosen;
-    Color? border;
-    if (answered) {
-      if (isCorrect) {
-        border = const Color(0xFF2E9E4F);
-      } else if (isChosen) {
-        border = const Color(0xFFD64545);
-      }
-    }
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: border == null
-            ? BorderSide.none
-            : BorderSide(color: border, width: 2),
-      ),
-      child: ListTile(
-        title: Text(text),
-        trailing: answered && isCorrect
-            ? const Icon(Icons.check, color: Color(0xFF2E9E4F))
-            : (answered && isChosen
-                ? const Icon(Icons.close, color: Color(0xFFD64545))
-                : null),
-        onTap: onTap,
+    final Color? accent = !answered
+        ? null
+        : isCorrect
+            ? _right
+            : isChosen
+                ? _wrong
+                : null;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 5),
+      child: Material(
+        color: accent?.withValues(alpha: 0.1) ?? theme.cardTheme.color,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+              color: accent ?? scheme.outlineVariant.withValues(alpha: 0.6),
+              width: accent == null ? 1 : 2),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 14, 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 30,
+                  height: 30,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: accent ?? scheme.surfaceContainerHighest,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: accent == null
+                      ? Text(letter,
+                          style: theme.textTheme.labelLarge
+                              ?.copyWith(fontWeight: FontWeight.w700))
+                      : Icon(isCorrect ? Icons.check : Icons.close,
+                          size: 18, color: Colors.white),
+                ),
+                const SizedBox(width: 14),
+                Expanded(child: Text(text, style: theme.textTheme.bodyLarge)),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

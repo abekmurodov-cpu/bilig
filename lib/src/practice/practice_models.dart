@@ -1,8 +1,10 @@
 import '../models/knowledge_item.dart';
 import 'code_drills.dart';
+import 'text_blanks.dart';
 
-/// How the user is quizzed during a practice session. The last three are the
-/// "coding branch": they only apply to code notes.
+/// How the user is quizzed during a practice session. Writing and reordering
+/// code are the "coding branch": they only apply to code notes. Fill in the
+/// blank works on every note (code notes blank code tokens, others key words).
 enum PracticeMethod {
   flashcard,
   multipleChoice,
@@ -26,15 +28,13 @@ enum PracticeMethod {
         PracticeMethod.typeAnswer => 'Type it; checked by match or AI.',
         PracticeMethod.codeSnippet =>
           'Rewrite the snippet; graded on working syntax, not an exact match.',
-        PracticeMethod.fillBlank => 'Fill the blanked-out tokens in the code.',
+        PracticeMethod.fillBlank => 'Type the key words taken out of the note.',
         PracticeMethod.reorder => 'Drag the shuffled code lines back into order.',
       };
 
   /// True for the coding-only drills, which quiz code-type notes.
   bool get isCoding =>
-      this == PracticeMethod.codeSnippet ||
-      this == PracticeMethod.fillBlank ||
-      this == PracticeMethod.reorder;
+      this == PracticeMethod.codeSnippet || this == PracticeMethod.reorder;
 }
 
 /// Which notes a practice session draws from.
@@ -91,12 +91,15 @@ class PracticeConfig {
         all.where((i) => (i.category?.trim() ?? '') == category?.trim()),
     };
 
-    if (method.isCoding) {
+    if (method == PracticeMethod.fillBlank) {
+      pool = pool.where((i) => i.type == KnowledgeType.code
+          ? _canFillBlank(i)
+          : textBlanks(i) != null);
+    } else if (method.isCoding) {
       // Coding drills quiz code notes whose snippet (in the answer/back field)
       // can actually produce the drill.
       pool = pool.where((i) => i.type == KnowledgeType.code).where((i) {
         return switch (method) {
-          PracticeMethod.fillBlank => _canFillBlank(i),
           PracticeMethod.reorder => _canReorder(i),
           _ => i.hasAnswer, // codeSnippet: needs the reference code in back
         };

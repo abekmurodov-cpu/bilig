@@ -13,8 +13,8 @@ import 'src/providers/knowledge_providers.dart';
 import 'src/providers/settings_providers.dart';
 import 'src/ui/app_shell.dart';
 import 'src/ui/onboarding_screen.dart';
+import 'src/ui/theme.dart';
 
-const _seedColor = Color(0xFF5B6CF0);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -63,17 +63,8 @@ class BiligApp extends ConsumerWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       themeMode: themeMode,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: _seedColor),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: _seedColor,
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
+      theme: buildTheme(Brightness.light),
+      darkTheme: buildTheme(Brightness.dark),
       home: ref.watch(onboardedProvider)
           ? const AppShell()
           : const OnboardingScreen(),

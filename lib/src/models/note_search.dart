@@ -2,14 +2,18 @@ import 'knowledge_item.dart';
 
 /// Notes matching [query] (every word must appear somewhere in the note:
 /// prompt, answer, category, tags or its questions; case- and
-/// accent-insensitive) and carrying every tag in [tags]. Prompt matches come
-/// first.
+/// accent-insensitive), carrying every tag in [tags] and, when [categories]
+/// isn't empty, in one of those categories ('' for notes without one).
+/// Prompt matches come first.
 List<KnowledgeItem> searchNotes(List<KnowledgeItem> notes, String query,
-    {Set<String> tags = const {}}) {
+    {Set<String> tags = const {}, Set<String> categories = const {}}) {
   final words = _fold(query).split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();
   final wanted = {for (final t in tags) t.toLowerCase()};
   final hits = <(KnowledgeItem, int)>[];
   for (final note in notes) {
+    if (categories.isNotEmpty && !categories.contains(note.category?.trim() ?? '')) {
+      continue;
+    }
     if (wanted.isNotEmpty) {
       final have = {for (final t in note.tags) t.toLowerCase()};
       if (!wanted.every(have.contains)) continue;

@@ -44,100 +44,218 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
     );
   }
 
+  /// How many cards [scope] would give with the chosen method.
+  int _count(PracticeScope scope, String? category) => PracticeConfig(
+        method: _method,
+        scope: scope,
+        category: category,
+      )
+          .buildQueue(
+            all: ref.watch(notesSortedProvider),
+            due: ref.watch(dueItemsProvider),
+            canGenerate: ref.watch(llmProvider) != null,
+          )
+          .length;
+
   @override
   Widget build(BuildContext context) {
-    final categories = ref.watch(categoriesProvider);
+    final strings = context.s;
     final theme = Theme.of(context);
+    final categories = ref.watch(categoryInfoProvider);
+    final needsCategory = _scope == PracticeScope.category && _category == null;
+    final cards = needsCategory ? 0 : _count(_scope, _category);
+    Widget heading(String text, {Widget? extra}) => Padding(
+          padding: const EdgeInsets.fromLTRB(4, 20, 4, 10),
+          child: Row(
+            children: [
+              Text(text, style: theme.textTheme.titleMedium),
+              const SizedBox(width: 8),
+              ?extra,
+            ],
+          ),
+        );
+    Widget grid(Iterable<PracticeMethod> methods) => LayoutBuilder(
+          builder: (context, box) {
+            final columns = box.maxWidth > 640 ? 3 : 2;
+            final width = (box.maxWidth - 10 * (columns - 1)) / columns;
+            return Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                for (final m in methods)
+                  SizedBox(
+                    width: width,
+                    child: _MethodCard(
+                      method: m,
+                      selected: _method == m,
+                      onTap: () => setState(() => _method = m),
+                    ),
+                  ),
+              ],
+            );
+          },
+        );
 
     return Scaffold(
-      appBar: AppBar(title: Text(context.s.navPractice)),
+      appBar: AppBar(title: Text(strings.navPractice)),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         children: [
-          Text(context.s.method, style: theme.textTheme.titleMedium),
-          const SizedBox(height: 8),
-          RadioGroup<PracticeMethod>(
-            groupValue: _method,
-            onChanged: (v) => setState(() => _method = v!),
-            child: Column(
-              children: [
-                for (final m in PracticeMethod.values.where((m) => !m.isCoding))
-                  RadioListTile<PracticeMethod>(
-                    value: m,
-                    title: Text(context.s.methodLabel(m)),
-                    subtitle: Text(context.s.methodBlurb(m)),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                Padding(
-                  padding: const EdgeInsets.only(top: 8, bottom: 4),
-                  child: Row(
-                    children: [
-                      Icon(Icons.code, size: 16, color: theme.colorScheme.primary),
-                      const SizedBox(width: 6),
-                      Text(context.s.codingDrills,
-                          style: theme.textTheme.labelLarge
-                              ?.copyWith(color: theme.colorScheme.primary)),
-                      const SizedBox(width: 6),
-                      Text(context.s.codeNotesOnly,
-                          style: theme.textTheme.labelSmall),
-                    ],
-                  ),
-                ),
-                for (final m in PracticeMethod.values.where((m) => m.isCoding))
-                  RadioListTile<PracticeMethod>(
-                    value: m,
-                    title: Text(context.s.methodLabel(m)),
-                    subtitle: Text(context.s.methodBlurb(m)),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-              ],
-            ),
+          heading(strings.method),
+          grid(PracticeMethod.values.where((m) => !m.isCoding)),
+          heading(
+            strings.codingDrills,
+            extra: Text(strings.codeNotesOnly,
+                style: theme.textTheme.labelMedium
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
           ),
-          const Divider(height: 32),
-          Text(context.s.scope, style: theme.textTheme.titleMedium),
-          const SizedBox(height: 8),
-          RadioGroup<PracticeScope>(
-            groupValue: _scope,
-            onChanged: (v) => setState(() => _scope = v!),
-            child: Column(
-              children: [
-                for (final s in PracticeScope.values)
-                  RadioListTile<PracticeScope>(
-                    value: s,
-                    title: Text(context.s.scopeLabel(s)),
-                    subtitle: Text(context.s.scopeBlurb(s)),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-              ],
-            ),
+          grid(PracticeMethod.values.where((m) => m.isCoding)),
+          heading(strings.scope),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final scope in PracticeScope.values)
+                ChoiceChip(
+                  avatar: Icon(_scopeIcon(scope), size: 18),
+                  showCheckmark: false,
+                  label: Text(scope == PracticeScope.category
+                      ? strings.scopeLabel(scope)
+                      : '${strings.scopeLabel(scope)} · ${_count(scope, null)}'),
+                  selected: _scope == scope,
+                  onSelected: (_) => setState(() => _scope = scope),
+                ),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 10, 4, 0),
+            child: Text(strings.scopeBlurb(_scope),
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
           ),
           if (_scope == PracticeScope.category) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
             if (categories.isEmpty)
-              Text(context.s.noCategories)
+              Text(strings.noCategories)
             else
-              DropdownButtonFormField<String>(
-                initialValue: _category,
-                decoration: InputDecoration(
-                  labelText: context.s.category,
-                  border: OutlineInputBorder(),
-                ),
-                items: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
                   for (final c in categories)
-                    DropdownMenuItem(value: c, child: Text(c)),
+                    ChoiceChip(
+                      avatar: const Icon(Icons.folder_outlined, size: 18),
+                      showCheckmark: false,
+                      label: Text('${c.name} · ${c.count}'),
+                      selected: _category == c.name,
+                      onSelected: (_) => setState(() => _category = c.name),
+                    ),
                 ],
-                onChanged: (v) => setState(() => _category = v),
               ),
           ],
-          const SizedBox(height: 32),
-          FilledButton.icon(
-            onPressed: (_scope == PracticeScope.category && _category == null)
-                ? null
-                : _start,
-            icon: const Icon(Icons.play_arrow),
-            label: Text(context.s.startPractice),
-          ),
         ],
+      ),
+      bottomNavigationBar: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: FilledButton.icon(
+            onPressed: cards == 0 ? null : _start,
+            icon: const Icon(Icons.play_arrow_rounded),
+            label: Text(needsCategory
+                ? strings.pickACategory
+                : cards == 0
+                    ? strings.noMatch
+                    : strings.startCards(cards)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+IconData _scopeIcon(PracticeScope scope) => switch (scope) {
+      PracticeScope.all => Icons.all_inclusive,
+      PracticeScope.due => Icons.schedule,
+      PracticeScope.weakPoints => Icons.trending_down,
+      PracticeScope.category => Icons.folder_outlined,
+    };
+
+IconData methodIcon(PracticeMethod method) => switch (method) {
+      PracticeMethod.flashcard => Icons.style_outlined,
+      PracticeMethod.multipleChoice => Icons.checklist,
+      PracticeMethod.typeAnswer => Icons.keyboard_outlined,
+      PracticeMethod.fillBlank => Icons.space_bar,
+      PracticeMethod.codeSnippet => Icons.code,
+      PracticeMethod.reorder => Icons.swap_vert,
+    };
+
+/// A practice method as a selectable card: icon, name and what it does.
+class _MethodCard extends StatelessWidget {
+  const _MethodCard({required this.method, required this.selected, required this.onTap});
+
+  final PracticeMethod method;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Material(
+      color: selected ? scheme.primaryContainer : theme.cardTheme.color,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: selected ? scheme.primary : Colors.transparent,
+          width: 1.6,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: selected ? scheme.primary : scheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(11),
+                    ),
+                    child: Icon(methodIcon(method),
+                        size: 20,
+                        color: selected ? scheme.onPrimary : scheme.onSurfaceVariant),
+                  ),
+                  const Spacer(),
+                  if (selected) Icon(Icons.check_circle, size: 20, color: scheme.primary),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(context.s.methodLabel(method),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: selected ? scheme.onPrimaryContainer : null)),
+              const SizedBox(height: 2),
+              SizedBox(
+                height: 34,
+                child: Text(context.s.methodBlurb(method),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                        color: selected
+                            ? scheme.onPrimaryContainer
+                            : scheme.onSurfaceVariant)),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

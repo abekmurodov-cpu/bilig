@@ -300,7 +300,6 @@ class _VoiceSheetState extends ConsumerState<VoiceSheet> {
               isExpanded: true,
               decoration: InputDecoration(
                 labelText: strings.voiceLanguage,
-                border: const OutlineInputBorder(),
                 isDense: true,
               ),
               items: [
@@ -342,7 +341,6 @@ class _VoiceSheetState extends ConsumerState<VoiceSheet> {
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               hintText: strings.voiceTextHint,
-              border: const OutlineInputBorder(),
             ),
           ),
           const SizedBox(height: 12),

@@ -23,7 +23,7 @@ class SettingsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: Text(context.s.navSettings)),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.fromLTRB(0, 4, 0, 24),
         children: const [
           _ThemeSection(),
           _LanguageSection(),
@@ -37,32 +37,55 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
-/// Reusable section header used across the settings screen.
+/// A settings group: a rounded card headed by an icon and a title.
 class SettingsSection extends StatelessWidget {
-  const SettingsSection({super.key, required this.title, required this.child});
+  const SettingsSection({super.key, required this.title, required this.child, this.icon});
 
   final String title;
   final Widget child;
+  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-          child: Text(
-            title,
-            style: theme.textTheme.titleSmall?.copyWith(
-              color: theme.colorScheme.primary,
-              fontWeight: FontWeight.w700,
-            ),
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+                child: Row(
+                  children: [
+                    if (icon != null) ...[
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: scheme.primaryContainer,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(icon, size: 18, color: scheme.onPrimaryContainer),
+                      ),
+                      const SizedBox(width: 12),
+                    ],
+                    Expanded(
+                      child: Text(title,
+                          style: theme.textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.w700)),
+                    ),
+                  ],
+                ),
+              ),
+              child,
+            ],
           ),
         ),
-        child,
-        const Divider(height: 24),
-      ],
+      ),
     );
   }
 }
@@ -75,6 +98,7 @@ class _ThemeSection extends ConsumerWidget {
     final mode = ref.watch(themeModeProvider);
     return SettingsSection(
       title: context.s.appearance,
+      icon: Icons.palette_outlined,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: SegmentedButton<ThemeMode>(
@@ -112,6 +136,7 @@ class _LanguageSection extends ConsumerWidget {
     final current = ref.watch(languageProvider);
     return SettingsSection(
       title: context.s.languageTitle,
+      icon: Icons.translate,
       child: RadioGroup<AppLanguage>(
         groupValue: current,
         onChanged: (l) {
@@ -141,6 +166,7 @@ class _RemindersSection extends ConsumerWidget {
     final notifier = ref.read(reminderProvider.notifier);
     return SettingsSection(
       title: context.s.reminders,
+      icon: Icons.notifications_none,
       child: Column(
         children: [
           SwitchListTile(
@@ -180,6 +206,7 @@ class _LlmSection extends ConsumerWidget {
     final config = ref.watch(aiConfigProvider);
     return SettingsSection(
       title: context.s.aiProvider,
+      icon: Icons.auto_awesome_outlined,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: config == null
@@ -338,7 +365,6 @@ class _AiConnectFormState extends ConsumerState<_AiConnectForm> {
         InputDecorator(
           decoration: InputDecoration(
             labelText: context.s.service,
-            border: const OutlineInputBorder(),
             isDense: true,
           ),
           child: DropdownButtonHideUnderline(
@@ -386,7 +412,6 @@ class _AiConnectFormState extends ConsumerState<_AiConnectForm> {
           decoration: InputDecoration(
             labelText: custom ? context.s.apiKeyOptional : context.s.apiKey,
             helperText: _keyHint,
-            border: const OutlineInputBorder(),
             suffixIcon: IconButton(
               icon: Icon(_obscure ? Icons.visibility : Icons.visibility_off),
               onPressed: () => setState(() => _obscure = !_obscure),
@@ -402,7 +427,6 @@ class _AiConnectFormState extends ConsumerState<_AiConnectForm> {
             decoration: InputDecoration(
               labelText: context.s.serverAddress,
               hintText: 'http://localhost:11434/v1',
-              border: const OutlineInputBorder(),
             ),
           ),
         ],
@@ -413,7 +437,6 @@ class _AiConnectFormState extends ConsumerState<_AiConnectForm> {
             autocorrect: false,
             decoration: InputDecoration(
               labelText: context.s.modelName,
-              border: const OutlineInputBorder(),
             ),
           ),
         ],
@@ -648,7 +671,6 @@ class _AiConnectedState extends ConsumerState<_AiConnected> {
               child: InputDecorator(
                 decoration: InputDecoration(
                   labelText: context.s.model,
-                  border: const OutlineInputBorder(),
                   isDense: true,
                 ),
                 child: DropdownButtonHideUnderline(
@@ -889,6 +911,7 @@ class _TelegramSectionState extends ConsumerState<_TelegramSection> {
 
     return SettingsSection(
       title: context.s.syncTelegram,
+      icon: Icons.cloud_sync_outlined,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: attached
@@ -945,7 +968,6 @@ class _TelegramSectionState extends ConsumerState<_TelegramSection> {
                     controller: _tokenController,
                     decoration: InputDecoration(
                       labelText: context.s.botToken,
-                      border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 12),
@@ -954,7 +976,6 @@ class _TelegramSectionState extends ConsumerState<_TelegramSection> {
                     decoration: InputDecoration(
                       labelText: context.s.chatId,
                       hintText: context.s.chatIdHint,
-                      border: OutlineInputBorder(),
                     ),
                   ),
                   const SizedBox(height: 12),

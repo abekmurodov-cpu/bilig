@@ -1,6 +1,8 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+
+import '../theme.dart';
 import 'package:flutter/services.dart';
 
 /// A Quizlet-style flashcard: a compact card that flips in 3D between [front]
@@ -85,23 +87,11 @@ class _Face extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
     return Container(
       width: double.infinity,
       height: 320,
       padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: scheme.outlineVariant),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+      decoration: practiceCardDecoration(context),
       child: Center(
         child: SingleChildScrollView(child: child),
       ),

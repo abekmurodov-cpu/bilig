@@ -9,6 +9,7 @@ import '../llm/llm_provider.dart';
 import '../llm/llm_providers.dart';
 import '../llm/quiz_prep.dart';
 import '../providers/knowledge_providers.dart';
+import 'widgets/category_field.dart';
 import 'widgets/image_picking.dart';
 import 'widgets/item_tile.dart';
 
@@ -154,7 +155,7 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
               minLines: 1,
               maxLines: 3,
               decoration: InputDecoration(
-                  labelText: context.s.prompt, border: const OutlineInputBorder()),
+                  labelText: context.s.prompt),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -162,8 +163,7 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
               minLines: 2,
               maxLines: 6,
               decoration: InputDecoration(
-                  labelText: context.s.answerDetails,
-                  border: const OutlineInputBorder()),
+                  labelText: context.s.answerDetails),
             ),
           ],
         ),
@@ -271,7 +271,6 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
             onChanged: (_) => setState(() {}),
             decoration: InputDecoration(
               hintText: strings.pasteHere,
-              border: const OutlineInputBorder(),
             ),
           ),
           Align(
@@ -350,13 +349,9 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
         if (i == drafts.length + 1) {
           return Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: TextField(
+            child: CategoryField(
               controller: _category,
-              decoration: InputDecoration(
-                labelText: _isImport ? strings.categoryForMissing : strings.categoryForAll,
-                prefixIcon: const Icon(Icons.folder_outlined),
-                border: const OutlineInputBorder(),
-              ),
+              labelText: _isImport ? strings.categoryForMissing : strings.categoryForAll,
             ),
           );
         }

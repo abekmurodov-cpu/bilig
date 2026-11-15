@@ -105,6 +105,31 @@ class AppStrings {
   // --- Notes / tree ------------------------------------------------------
   String get viewList => _t('List', 'Ro‘yxat', 'Список');
   String get viewTree => _t('Tree', 'Daraxt', 'Дерево');
+  String searchNotesCount(int n) => _t('Search $n notes', '$n ta qaydni qidirish',
+      'Поиск по заметкам: $n');
+  String foundNotes(int n) =>
+      _t(n == 1 ? '1 note' : '$n notes', '$n ta qayd', 'Найдено заметок: $n');
+  String get allCategories =>
+      _t('All categories', 'Barcha turkumlar', 'Все категории');
+  String categoriesChosen(int n) =>
+      _t('$n categories', '$n ta turkum', 'Категорий: $n');
+  String get showAll => _t('Show all', 'Hammasini ko‘rsatish', 'Показать все');
+  String startCards(int n) => _t(n == 1 ? 'Start · 1 card' : 'Start · $n cards',
+      'Boshlash · $n ta karta', 'Начать · карточек: $n');
+  String get pickACategory =>
+      _t('Pick a category', 'Turkumni tanlang', 'Выберите категорию');
+  String get sessionDone =>
+      _t('Session complete', 'Mashg‘ulot tugadi', 'Занятие завершено');
+  String get greatSession => _t('Great work!', 'Ajoyib!', 'Отлично!');
+  String practiseMissed(int n) => _t(
+      n == 1 ? 'Practise the 1 you missed' : 'Practise the $n you missed',
+      'Xato qilingan $n tasini qayta mashq qilish',
+      'Повторить ошибки: $n');
+  String get statusNew => _t('New', 'Yangi', 'Новая');
+  String get statusDue => _t('Due now', 'Takrorlash vaqti', 'Пора повторить');
+  String nextIn(int days) => days <= 0
+      ? _t('Later today', 'Bugun', 'Сегодня')
+      : _t('In $days d', '$days kundan keyin', 'Через $days дн.');
   String get legendLearned => _t('Learned', 'O‘zlashtirilgan', 'Выучено');
   String get legendNeedsTraining =>
       _t('Needs training', 'Takrorlash kerak', 'Нужно повторить');
@@ -141,6 +166,14 @@ class AppStrings {
       );
   String get generateAnswer =>
       _t('Generate answer', 'Javob yaratish', 'Сгенерировать ответ');
+  String get categoryHint => _t('e.g. Biology, History, Linux',
+      'masalan: Biologiya, Tarix, Linux', 'например: Биология, История, Linux');
+  String get categoryPickHint => _t('Pick one or type a new name',
+      'Tanlang yoki yangi nom yozing', 'Выберите или введите новое название');
+  String get newCategory =>
+      _t('New category', 'Yangi turkum', 'Новая категория');
+  String get chooseCategory =>
+      _t('Choose a category', 'Turkumni tanlash', 'Выбрать категорию');
   String get categoryOptional =>
       _t('Category (optional)', 'Turkum (ixtiyoriy)', 'Категория (необязательно)');
   String get suggestCategory =>
@@ -777,6 +810,11 @@ class AppStrings {
         'Har bir bo‘sh joyni bosing va tushib qolgan qismni yozing.',
         'Нажмите на каждый пропуск и впишите недостающее.',
       );
+  String get textBlanksSubtitle => _t(
+        'Type the missing words. Small typos are fine.',
+        'Tushib qolgan so‘zlarni yozing. Kichik xatolar hisobga olinmaydi.',
+        'Впишите пропущенные слова. Мелкие опечатки не страшны.',
+      );
   String get reorderTitle =>
       _t('Reorder the code', 'Kodni tartiblang', 'Расставьте код по порядку');
   String get reorderSubtitle => _t('Drag the lines into the correct order.',
@@ -816,26 +854,18 @@ class AppStrings {
       };
 
   String methodBlurb(PracticeMethod m) => switch (m) {
-        PracticeMethod.flashcard => _t('Reveal the answer and grade yourself.',
-            'Javobni oching va o‘zingizni baholang.', 'Откройте ответ и оцените себя.'),
-        PracticeMethod.multipleChoice => _t('Pick the right answer from options.',
-            'Variantlardan to‘g‘ri javobni tanlang.',
-            'Выберите правильный ответ из вариантов.'),
+        PracticeMethod.flashcard => _t('Flip, recall, grade yourself.',
+            'Aylantiring, eslang, o‘zingizni baholang.', 'Переверните, вспомните, оцените себя.'),
+        PracticeMethod.multipleChoice => _t('Pick the right answer.',
+            'To‘g‘ri javobni tanlang.', 'Выберите правильный ответ.'),
         PracticeMethod.typeAnswer => _t('Type it; checked by match or AI.',
-            'Javobni yozing; moslik yoki AI orqali tekshiriladi.',
-            'Введите ответ; проверка по совпадению или ИИ.'),
-        PracticeMethod.codeSnippet => _t(
-            'Rewrite the snippet; graded on working syntax, not an exact match.',
-            'Parchani qayta yozing; aniq moslik emas, ishlaydigan sintaksis '
-                'baholanadi.',
-            'Перепишите фрагмент; оценивается рабочий синтаксис, а не точное '
-                'совпадение.'),
-        PracticeMethod.fillBlank => _t('Fill the blanked-out tokens in the code.',
-            'Koddagi yashirilgan qismlarni to‘ldiring.',
-            'Заполните скрытые фрагменты кода.'),
-        PracticeMethod.reorder => _t('Drag the shuffled code lines back into order.',
-            'Aralashgan kod qatorlarini tartibga keltiring.',
-            'Расставьте перемешанные строки кода по порядку.'),
+            'Yozing; moslik yoki AI tekshiradi.', 'Введите; проверка совпадением или ИИ.'),
+        PracticeMethod.fillBlank => _t('Type the missing key words.',
+            'Tushib qolgan asosiy so‘zlarni yozing.', 'Впишите пропущенные ключевые слова.'),
+        PracticeMethod.codeSnippet => _t('Rewrite the snippet from memory.',
+            'Kodni xotiradan qayta yozing.', 'Напишите фрагмент по памяти.'),
+        PracticeMethod.reorder => _t('Put the shuffled lines in order.',
+            'Aralash qatorlarni tartiblang.', 'Расставьте строки по порядку.'),
       };
 
   String scopeLabel(PracticeScope s) => switch (s) {

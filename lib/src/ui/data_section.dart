@@ -89,6 +89,7 @@ class _DataSectionState extends ConsumerState<DataSection> {
         (n) => n.tags.any((t) => sampleTags.contains(t.toLowerCase())));
     return SettingsSection(
       title: strings.yourNotes,
+      icon: Icons.inventory_2_outlined,
       child: Column(
         children: [
           if (_busy) const LinearProgressIndicator(),

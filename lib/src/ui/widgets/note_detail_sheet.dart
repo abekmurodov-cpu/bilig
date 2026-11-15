@@ -8,6 +8,7 @@ import '../../llm/quiz_prep.dart';
 import '../../models/knowledge_item.dart';
 import '../../providers/knowledge_providers.dart';
 import '../../models/highlights.dart';
+import 'category_field.dart';
 import 'image_picking.dart';
 import 'item_tile.dart';
 import 'markable_text.dart';
@@ -337,7 +338,7 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
           minLines: 1,
           maxLines: 4,
           decoration: InputDecoration(
-              labelText: context.s.prompt, border: OutlineInputBorder()),
+              labelText: context.s.prompt),
         ),
         const SizedBox(height: 12),
         TextField(
@@ -345,14 +346,10 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
           minLines: 2,
           maxLines: 6,
           decoration: InputDecoration(
-              labelText: context.s.answerDetails, border: OutlineInputBorder()),
+              labelText: context.s.answerDetails),
         ),
         const SizedBox(height: 12),
-        TextField(
-          controller: _category,
-          decoration: InputDecoration(
-              labelText: context.s.category, border: OutlineInputBorder()),
-        ),
+        CategoryField(controller: _category, labelText: context.s.category),
         const SizedBox(height: 12),
         TextField(
           controller: _tags,
@@ -360,7 +357,6 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
             labelText: context.s.tagsField,
             hintText: context.s.tagsHint,
             prefixIcon: const Icon(Icons.sell_outlined),
-            border: const OutlineInputBorder(),
           ),
         ),
         const SizedBox(height: 12),
@@ -804,7 +800,7 @@ class _QuestionDialogState extends State<_QuestionDialog> {
               minLines: 1,
               maxLines: 3,
               decoration: InputDecoration(
-                  labelText: strings.questionField, border: const OutlineInputBorder()),
+                  labelText: strings.questionField),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -812,8 +808,7 @@ class _QuestionDialogState extends State<_QuestionDialog> {
               minLines: 1,
               maxLines: 3,
               decoration: InputDecoration(
-                  labelText: strings.correctAnswerField,
-                  border: const OutlineInputBorder()),
+                  labelText: strings.correctAnswerField),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -824,7 +819,6 @@ class _QuestionDialogState extends State<_QuestionDialog> {
                 labelText: strings.wrongOptionsField,
                 helperText: strings.wrongOptionsHint,
                 helperMaxLines: 3,
-                border: const OutlineInputBorder(),
               ),
             ),
           ],

@@ -3,7 +3,8 @@
 String normalizeAnswer(String input) {
   return input
       .toLowerCase()
-      .replaceAll(RegExp(r'[^\w\s]'), ' ')
+      // Letters of any script (a plain \w would wipe out Cyrillic).
+      .replaceAll(RegExp(r'[^\p{L}\p{N}\s]', unicode: true), ' ')
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
 }

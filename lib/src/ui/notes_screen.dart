@@ -27,12 +27,18 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   final _search = TextEditingController();
   final Set<String> _tags = {};
 
-  bool get _filtering => _search.text.trim().isNotEmpty || _tags.isNotEmpty;
+  /// Chosen categories ('' stands for notes without one); none is all.
+  final Set<String> _categories = {};
+
+  bool get _filtering =>
+      _search.text.trim().isNotEmpty || _tags.isNotEmpty || _categories.isNotEmpty;
 
   /// The notes to show: everything, or the search results.
   List<KnowledgeItem> _notes() {
     final all = ref.watch(notesSortedProvider);
-    return _filtering ? searchNotes(all, _search.text, tags: _tags) : all;
+    return _filtering
+        ? searchNotes(all, _search.text, tags: _tags, categories: _categories)
+        : all;
   }
 
   @override
@@ -58,67 +64,79 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     }
   }
 
+  void _toggleCategory(String category, bool on) => setState(() {
+        on ? _categories.add(category) : _categories.remove(category);
+        _visible = _pageSize;
+      });
+
   @override
   Widget build(BuildContext context) {
+    final strings = context.s;
     final tags = ref.watch(tagsProvider);
+    final groups = ref.watch(notesByCategoryProvider);
+    final total = ref.watch(notesSortedProvider).length;
+    final showFilters = tags.isNotEmpty || groups.length > 1;
     return Scaffold(
       appBar: AppBar(
-        title: Text(context.s.navNotes),
+        title: Text(strings.navNotes),
+        actions: [
+          IconButton(
+            tooltip: _view == _NotesView.list ? strings.viewTree : strings.viewList,
+            icon: Icon(_view == _NotesView.list ? Icons.park_outlined : Icons.view_agenda_outlined),
+            onPressed: () => setState(() => _view =
+                _view == _NotesView.list ? _NotesView.tree : _NotesView.list),
+          ),
+          const SizedBox(width: 4),
+        ],
         bottom: PreferredSize(
-          preferredSize: Size.fromHeight(tags.isEmpty ? 64 : 108),
+          preferredSize: Size.fromHeight(showFilters ? 112 : 64),
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
             child: Column(
               children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _search,
-                        onChanged: (_) => setState(() => _visible = _pageSize),
-                        decoration: InputDecoration(
-                          hintText: context.s.searchNotes,
-                          prefixIcon: const Icon(Icons.search),
-                          suffixIcon: _search.text.isEmpty
-                              ? null
-                              : IconButton(
-                                  tooltip: context.s.clear,
-                                  icon: const Icon(Icons.close),
-                                  onPressed: () => setState(_search.clear),
-                                ),
-                          isDense: true,
-                          border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(28)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    SegmentedButton<_NotesView>(
-                      showSelectedIcon: false,
-                      segments: [
-                        ButtonSegment(
-                          value: _NotesView.list,
-                          tooltip: context.s.viewList,
-                          icon: const Icon(Icons.view_list),
-                        ),
-                        ButtonSegment(
-                          value: _NotesView.tree,
-                          tooltip: context.s.viewTree,
-                          icon: const Icon(Icons.park),
-                        ),
-                      ],
-                      selected: {_view},
-                      onSelectionChanged: (s) => setState(() => _view = s.first),
-                    ),
-                  ],
+                TextField(
+                  controller: _search,
+                  onChanged: (_) => setState(() => _visible = _pageSize),
+                  decoration: InputDecoration(
+                    hintText: strings.searchNotesCount(total),
+                    prefixIcon: const Icon(Icons.search),
+                    suffixIcon: _search.text.isEmpty
+                        ? null
+                        : IconButton(
+                            tooltip: strings.clear,
+                            icon: const Icon(Icons.close),
+                            onPressed: () => setState(_search.clear),
+                          ),
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(28),
+                        borderSide: BorderSide.none),
+                    enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(28),
+                        borderSide: BorderSide.none),
+                    focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(28),
+                        borderSide: BorderSide(
+                            color: Theme.of(context).colorScheme.primary, width: 1.6)),
+                  ),
                 ),
-                if (tags.isNotEmpty)
+                if (showFilters)
                   SizedBox(
-                    height: 44,
+                    height: 48,
                     child: ListView(
                       scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.only(top: 6),
+                      padding: const EdgeInsets.only(top: 8),
                       children: [
+                        if (groups.length > 1) ...[
+                          _CategoryFilter(
+                            groups: groups,
+                            selected: _categories,
+                            onToggle: _toggleCategory,
+                            onClear: () => setState(_categories.clear),
+                          ),
+                          const SizedBox(width: 6),
+                        ],
                         for (final (tag, count) in tags)
                           Padding(
                             padding: const EdgeInsets.only(right: 6),
@@ -152,13 +170,23 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
       return _filtering ? _NoResults(query: _search.text) : const _EmptyNotes();
     }
     final count = _visible.clamp(0, notes.length);
+    final header = _filtering ? 1 : 0;
     final hasMore = count < notes.length;
     return ListView.separated(
       controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
-      itemCount: count + (hasMore ? 1 : 0),
-      separatorBuilder: (_, _) => const SizedBox(height: 4),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      itemCount: header + count + (hasMore ? 1 : 0),
+      separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (context, i) {
+        if (i < header) {
+          return Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: Text(context.s.foundNotes(notes.length),
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          );
+        }
+        i -= header;
         if (i >= count) {
           return const Padding(
             padding: EdgeInsets.all(16),
@@ -168,6 +196,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
         final item = notes[i];
         return ItemTile(
           item: item,
+          showCategory: _categories.length != 1,
           onTap: () => showNoteDetailSheet(context, item),
         );
       },
@@ -261,6 +290,66 @@ class _NoResults extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(32),
         child: Text(context.s.noResults(query.trim()), textAlign: TextAlign.center),
+      ),
+    );
+  }
+}
+
+/// "Category ▾": a menu to show only some categories' notes.
+class _CategoryFilter extends StatelessWidget {
+  const _CategoryFilter({
+    required this.groups,
+    required this.selected,
+    required this.onToggle,
+    required this.onClear,
+  });
+
+  final Map<String, List<KnowledgeItem>> groups;
+  final Set<String> selected;
+  final void Function(String category, bool on) onToggle;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    final strings = context.s;
+    String key(String group) => group == kUngroupedCategory ? '' : group;
+    final label = switch (selected.length) {
+      0 => strings.allCategories,
+      1 => selected.first.isEmpty ? strings.ungrouped : selected.first,
+      final n => strings.categoriesChosen(n),
+    };
+    return MenuAnchor(
+      menuChildren: [
+        for (final e in groups.entries)
+          CheckboxMenuButton(
+            value: selected.contains(key(e.key)),
+            closeOnActivate: false,
+            onChanged: (on) => onToggle(key(e.key), on ?? false),
+            trailingIcon: Text('${e.value.length}',
+                style: Theme.of(context).textTheme.labelMedium),
+            child: Text(categoryDisplayName(context, e.key)),
+          ),
+        if (selected.isNotEmpty) ...[
+          const Divider(height: 8),
+          MenuItemButton(
+            leadingIcon: const Icon(Icons.clear_all),
+            onPressed: onClear,
+            child: Text(strings.showAll),
+          ),
+        ],
+      ],
+      builder: (context, menu, _) => FilterChip(
+        avatar: Icon(Icons.folder_outlined,
+            size: 18,
+            color: selected.isEmpty ? null : Theme.of(context).colorScheme.onSecondaryContainer),
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [Text(label), const Icon(Icons.arrow_drop_down, size: 18)],
+        ),
+        showCheckmark: false,
+        visualDensity: VisualDensity.compact,
+        selected: selected.isNotEmpty,
+        onSelected: (_) => menu.isOpen ? menu.close() : menu.open(),
       ),
     );
   }
