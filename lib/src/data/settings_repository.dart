@@ -40,6 +40,7 @@ class SettingsRepository {
   static const String kReminderMinute = 'reminderMinute';
   static const String kVoiceMode = 'voiceMode';
   static const String kExams = 'exams';
+  static const String kOnboarded = 'onboarded';
   static const String kActivity = 'activity';
   static const String kVoiceLocale = 'voiceLocale';
 

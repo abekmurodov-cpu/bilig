@@ -332,6 +332,92 @@ class AppStrings {
         'Заполните пропуск в уме, затем откройте ответ и оцените себя.',
       );
 
+  // --- Easier to use --------------------------------------------------------
+  String get undoGrade => _t('Undo last grade', 'Oxirgi bahoni bekor qilish',
+      'Отменить последнюю оценку');
+  String get swipeHint => _t('Swipe ← Again · Good →', 'Suring: ← Yana · Yaxshi →',
+      'Смахните: ← Снова · Хорошо →');
+  String get keyboardHint => _t('Space flip · 1–4 grade · ←/→ browse · ⌘Z undo',
+      'Probel — aylantirish · 1–4 — baho · ←/→ — varaqlash · ⌘Z — bekor qilish',
+      'Пробел — перевернуть · 1–4 — оценка · ←/→ — листать · ⌘Z — отменить');
+
+  String get searchNotes => _t('Search notes', 'Qaydlarni qidirish', 'Поиск заметок');
+  String get clear => _t('Clear', 'Tozalash', 'Очистить');
+  String noResults(String q) => q.isEmpty
+      ? _t('No notes with these tags.', 'Bu teglar bilan qayd yo‘q.', 'Нет заметок с этими тегами.')
+      : _t('Nothing found for “$q”.', '“$q” bo‘yicha hech narsa topilmadi.',
+          'По запросу «$q» ничего не найдено.');
+  String get tagsField => _t('Tags (optional, comma-separated)',
+      'Teglar (ixtiyoriy, vergul bilan)', 'Теги (необязательно, через запятую)');
+  String get tagsHint => _t('e.g. exam1, hard, week3', 'masalan: imtihon1, qiyin, 3-hafta',
+      'например: экзамен1, сложно, неделя3');
+
+  String get skip => _t('Skip', 'O‘tkazib yuborish', 'Пропустить');
+  String get tour1Title => _t('Notes that quiz you back', 'Sizni sinaydigan qaydlar',
+      'Заметки, которые вас проверяют');
+  String get tour1Body => _t(
+        'Write down anything worth remembering: type it, say it, snap a photo of a page, or paste a whole lecture and let it split into notes.',
+        'Eslab qolishga arziydigan hamma narsani yozing: tering, ayting, sahifani suratga oling yoki butun ma’ruzani joylab, qaydlarga bo‘ling.',
+        'Записывайте всё, что стоит запомнить: напечатайте, продиктуйте, сфотографируйте страницу или вставьте целую лекцию и разбейте её на заметки.',
+      );
+  String get tour2Title => _t('Questions written for you', 'Savollar siz uchun yoziladi',
+      'Вопросы пишутся за вас');
+  String get tour2Body => _t(
+        'Mark the key ideas with the marker. An AI of your choice (Gemini is free) turns each note into quiz questions; without one, highlights become fill-in-the-blank cards.',
+        'Asosiy fikrlarni marker bilan belgilang. O‘zingiz tanlagan AI (Gemini bepul) har bir qaydni test savollariga aylantiradi; AIsiz belgilar bo‘sh joyni to‘ldirish kartalariga aylanadi.',
+        'Отмечайте главное маркером. Выбранный вами ИИ (Gemini бесплатен) превращает каждую заметку в вопросы; без ИИ выделенное станет карточками с пропусками.',
+      );
+  String get tour3Title => _t('A few minutes a day', 'Kuniga bir necha daqiqa',
+      'Несколько минут в день');
+  String get tour3Body => _t(
+        'Bilig asks each note again just before you’d forget it. Review a little every day and watch your knowledge grow into a tree.',
+        'Bilig har bir qaydni unutishingizdan sal oldin yana so‘raydi. Har kuni oz-ozdan takrorlang va bilimingiz daraxtdek o‘sishini kuzating.',
+        'Bilig спрашивает каждую заметку снова незадолго до того, как вы бы её забыли. Повторяйте понемногу каждый день и смотрите, как знания растут в дерево.',
+      );
+  String get trySamples => _t('Try it with sample notes', 'Namuna qaydlar bilan sinab ko‘rish',
+      'Попробовать на примерах');
+  String get startEmpty => _t('Start with my own notes', 'O‘z qaydlarim bilan boshlash',
+      'Начать со своих заметок');
+
+  String get yourNotes => _t('Your notes', 'Qaydlaringiz', 'Ваши заметки');
+  String get exportBackup =>
+      _t('Save a backup', 'Zaxira nusxa saqlash', 'Сохранить резервную копию');
+  String get exportBackupBlurb => _t('All notes, images and progress in one .bilig file.',
+      'Barcha qaydlar, rasmlar va natijalar bitta .bilig faylda.',
+      'Все заметки, изображения и прогресс в одном файле .bilig.');
+  String get restoreBackup =>
+      _t('Open a .bilig file', '.bilig faylni ochish', 'Открыть файл .bilig');
+  String get restoreBackupBlurb => _t(
+        'Restore a backup or add a category a classmate shared.',
+        'Zaxira nusxani tiklang yoki kursdoshingiz ulashgan turkumni qo‘shing.',
+        'Восстановить копию или добавить категорию, которой поделился однокурсник.',
+      );
+  String get importAnki =>
+      _t('Import from Anki or Quizlet', 'Anki yoki Quizletdan import', 'Импорт из Anki или Quizlet');
+  String get importAnkiBlurb => _t('Anki decks (.apkg) or exported text (.txt, .csv).',
+      'Anki to‘plamlari (.apkg) yoki eksport qilingan matn (.txt, .csv).',
+      'Колоды Anki (.apkg) или экспортированный текст (.txt, .csv).');
+  String get importTitle => _t('Import', 'Import', 'Импорт');
+  String get removeSamples =>
+      _t('Remove the sample notes', 'Namuna qaydlarni o‘chirish', 'Удалить примеры');
+  String samplesRemoved(int n) => _t('Removed $n sample notes.',
+      '$n ta namuna qayd o‘chirildi.', 'Удалено примеров: $n.');
+  String backupSaved(int n) => _t('Backup saved: $n notes.',
+      'Zaxira saqlandi: $n ta qayd.', 'Копия сохранена: $n заметок.');
+  String imported(int added, int updated) => _t(
+        'Added $added notes${updated > 0 ? ', updated $updated' : ''}.',
+        '$added ta qayd qo‘shildi${updated > 0 ? ', $updated tasi yangilandi' : ''}.',
+        'Добавлено: $added${updated > 0 ? ', обновлено: $updated' : ''}.',
+      );
+  String get nothingToImport => _t('No notes found in that file.',
+      'Bu faylda qayd topilmadi.', 'В этом файле нет заметок.');
+  String fileFailed(Object e) => _t('Couldn’t read or save the file: $e',
+      'Faylni o‘qib yoki saqlab bo‘lmadi: $e', 'Не удалось прочитать или сохранить файл: $e');
+  String get selectAll => _t('Select all', 'Hammasini tanlash', 'Выбрать все');
+  String get selectNone => _t('Select none', 'Hech birini', 'Снять все');
+  String get categoryForMissing => _t('Category for notes without a deck (optional)',
+      'To‘plamsiz qaydlar uchun turkum (ixtiyoriy)', 'Категория для заметок без колоды (необязательно)');
+
   // --- Reviewing better ----------------------------------------------------
   String get partlyRight => _t('Partly right', 'Qisman to‘g‘ri', 'Частично верно');
   String get allCaughtUp => _t('All caught up', 'Hammasi takrorlangan', 'Всё повторено');

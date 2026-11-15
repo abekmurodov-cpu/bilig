@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_strings.dart';
@@ -61,6 +62,12 @@ class _PracticeSessionScreenState
   // view-only when revisited with "Previous".
   int _frontier = 0;
   final Map<int, ReviewGrade> _flashGrades = {};
+
+  /// Grades given this session, newest last, so they can be undone.
+  final List<_Graded> _history = [];
+
+  /// The flashcard on screen; a new key per card so each starts face up.
+  var _flipKey = GlobalKey<FlipCardState>();
   // Multiple-choice state.
   List<String>? _options;
   String? _correctOption;
@@ -176,6 +183,7 @@ class _PracticeSessionScreenState
   /// time by [QuizPrep] — practice itself never calls the AI for questions),
   /// then builds the multiple-choice option set.
   Future<void> _prepareItem() async {
+    _flipKey = GlobalKey<FlipCardState>();
     _syncFromStore();
     _cloze = _usesQuiz && _item.activeQuiz == null
         ? clozeQuiz(_item, ref.read(notesSortedProvider))
@@ -346,6 +354,7 @@ class _PracticeSessionScreenState
     final messenger = ScaffoldMessenger.of(context);
     final answered = _wasCorrect != null;
     if (_wasCorrect == true) _correctCount--;
+    _history.removeWhere((h) => h.index == _index);
     // _item is the copy as shown, from before any grade (grading saves a new
     // copy but doesn't touch the queue), so saving it also undoes the grade.
     await ref
@@ -367,10 +376,38 @@ class _PracticeSessionScreenState
   bool get _canReveal => _revealAnswer?.trim().isNotEmpty ?? false;
 
   Future<void> _grade(ReviewGrade grade) async {
+    _buzz(grade);
     _flashGrades[_index] = grade;
+    final counted = grade.quality >= 3;
+    _history.add(_Graded(_index, _item, grade, counted));
     await ref.read(knowledgeListProvider.notifier).grade(_item, grade);
-    if (grade.quality >= 3) _correctCount++;
+    if (counted) _correctCount++;
     _advance();
+  }
+
+  /// A light tap for a good grade, a firmer one for a miss.
+  void _buzz(ReviewGrade grade) => grade == ReviewGrade.again
+      ? HapticFeedback.mediumImpact()
+      : HapticFeedback.lightImpact();
+
+  /// Takes back the last grade: the note is restored and its card comes back
+  /// unanswered.
+  Future<void> _undo() async {
+    if (_history.isEmpty) return;
+    final last = _history.removeLast();
+    HapticFeedback.selectionClick();
+    await ref.read(knowledgeListProvider.notifier).undoGrade(last.before, last.grade);
+    if (!mounted) return;
+    if (last.counted) _correctCount--;
+    _flashGrades.remove(last.index);
+    _disposeBlankControllers();
+    setState(() {
+      _queue[last.index] = last.before;
+      _index = last.index;
+      _frontier = last.index;
+      _clearCard();
+    });
+    _prepareItem();
   }
 
   /// Flashcard navigation. Moving past the frontier skips the card ungraded.
@@ -392,12 +429,12 @@ class _PracticeSessionScreenState
       _partial = correct && partial;
     });
     // Persist the outcome via the scheduler.
-    await ref.read(knowledgeListProvider.notifier).grade(
-          _item,
-          !correct
-              ? ReviewGrade.again
-              : (_partial ? ReviewGrade.hard : ReviewGrade.good),
-        );
+    final grade = !correct
+        ? ReviewGrade.again
+        : (_partial ? ReviewGrade.hard : ReviewGrade.good);
+    _buzz(grade);
+    _history.add(_Graded(_index, _item, grade, correct));
+    await ref.read(knowledgeListProvider.notifier).grade(_item, grade);
     if (correct) _correctCount++;
   }
 
@@ -407,21 +444,26 @@ class _PracticeSessionScreenState
     setState(() {
       _index++;
       if (_index > _frontier) _frontier = _index;
-      _revealed = false;
-      _selfCheck = false;
-      _chosen = null;
-      _options = null;
-      _correctOption = null;
-      _wasCorrect = null;
-      _feedback = null;
-      _partial = false;
-      _why = null;
-      _explaining = false;
-      _reorderCurrent = [];
-      _answerController.clear();
-      _codeController.clear();
+      _clearCard();
     });
     if (_index < _queue.length) _prepareItem();
+  }
+
+  /// Resets what the card on screen shows (answer, options, results).
+  void _clearCard() {
+    _revealed = false;
+    _selfCheck = false;
+    _chosen = null;
+    _options = null;
+    _correctOption = null;
+    _wasCorrect = null;
+    _feedback = null;
+    _partial = false;
+    _why = null;
+    _explaining = false;
+    _reorderCurrent = [];
+    _answerController.clear();
+    _codeController.clear();
   }
 
   @override
@@ -441,6 +483,12 @@ class _PracticeSessionScreenState
             ? context.s.done
             : '${context.s.methodLabel(widget.config.method)}  ${_index + 1}/${_queue.length}'),
         actions: [
+          if (_history.isNotEmpty)
+            IconButton(
+              tooltip: context.s.undoGrade,
+              icon: const Icon(Icons.undo),
+              onPressed: _undo,
+            ),
           if (!done && _canFlag)
             IconButton(
               tooltip: context.s.badQuestion,
@@ -449,15 +497,95 @@ class _PracticeSessionScreenState
             ),
         ],
       ),
-      body: done
-          ? _buildDone()
-          : Column(
-              children: [
-                if (showPause) _PauseBanner(pause: prep.pause!),
-                Expanded(child: _buildBody()),
-              ],
-            ),
+      body: Focus(
+        autofocus: true,
+        onKeyEvent: _onKey,
+        child: done
+            ? _buildDone()
+            : Column(
+                children: [
+                  if (showPause) _PauseBanner(pause: prep.pause!),
+                  Expanded(child: _buildBody()),
+                ],
+              ),
+      ),
     );
+  }
+
+  bool get _showFlashGrades =>
+      _index >= _frontier && (_revealed || !_canReveal);
+
+  /// Keyboard shortcuts (on a Mac or with a keyboard): Space/Enter flips or
+  /// moves on, 1–4 grade or pick an option, ←/→ browse flashcards, ⌘Z/Ctrl+Z
+  /// undoes. Ignored while typing in a text field.
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent) return KeyEventResult.ignored;
+    final focused = FocusManager.instance.primaryFocus?.context;
+    if (focused != null &&
+        (focused.widget is EditableText ||
+            focused.findAncestorWidgetOfExactType<EditableText>() != null)) {
+      return KeyEventResult.ignored;
+    }
+    final key = event.logicalKey;
+    final keys = HardwareKeyboard.instance;
+    if (key == LogicalKeyboardKey.keyZ && (keys.isMetaPressed || keys.isControlPressed)) {
+      _undo();
+      return KeyEventResult.handled;
+    }
+    if (_index >= _queue.length || _warmingUp || _preparing) {
+      return KeyEventResult.ignored;
+    }
+    const digits = [
+      LogicalKeyboardKey.digit1,
+      LogicalKeyboardKey.digit2,
+      LogicalKeyboardKey.digit3,
+      LogicalKeyboardKey.digit4,
+    ];
+    final digit = digits.indexOf(key);
+    final confirm = key == LogicalKeyboardKey.space ||
+        key == LogicalKeyboardKey.enter ||
+        key == LogicalKeyboardKey.numpadEnter;
+    final method = widget.config.method;
+
+    if (_selfCheck || method == PracticeMethod.flashcard) {
+      final graded = _selfCheck ? _revealed : _showFlashGrades;
+      if (digit >= 0 && graded && _index >= _frontier) {
+        _grade(ReviewGrade.values[digit]);
+        return KeyEventResult.handled;
+      }
+      if (confirm && !graded) {
+        if (_selfCheck) {
+          setState(() => _revealed = true);
+        } else {
+          _flipKey.currentState?.flip();
+        }
+        return KeyEventResult.handled;
+      }
+      if (!_selfCheck && key == LogicalKeyboardKey.arrowLeft && _index > 0) {
+        _goToCard(_index - 1);
+        return KeyEventResult.handled;
+      }
+      if (!_selfCheck && key == LogicalKeyboardKey.arrowRight) {
+        _goToCard(_index + 1);
+        return KeyEventResult.handled;
+      }
+      return KeyEventResult.ignored;
+    }
+    if (_wasCorrect != null && confirm) {
+      _advance();
+      return KeyEventResult.handled;
+    }
+    final options = _options;
+    if (method == PracticeMethod.multipleChoice &&
+        _wasCorrect == null &&
+        options != null &&
+        digit >= 0 &&
+        digit < options.length) {
+      setState(() => _chosen = options[digit]);
+      _submitObjective(options[digit] == _correctOption);
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
   }
 
   Widget _buildBody() {
@@ -556,6 +684,12 @@ class _PracticeSessionScreenState
     );
   }
 
+  /// Desktop and web usually have a keyboard: show the shortcuts there.
+  bool get _hasKeyboard =>
+      kIsWeb ||
+      const {TargetPlatform.macOS, TargetPlatform.windows, TargetPlatform.linux}
+          .contains(defaultTargetPlatform);
+
   // --- Self-check (no usable quiz for this card) --------------------------
   Widget _buildSelfCheck(String hint) {
     final theme = Theme.of(context);
@@ -628,22 +762,31 @@ class _PracticeSessionScreenState
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    FlipCard(
-                      key: ValueKey(_index),
-                      onFlip: (back) {
-                        if (back && !_revealed) {
-                          setState(() => _revealed = true);
-                        }
-                      },
-                      front: _cardFace(
-                        context.s.noteType(_item.type).toUpperCase(),
-                        _prompt,
-                        withImage: _item.hasImage,
-                      ),
-                      back: _cardFace(
-                        context.s.answerLabel,
-                        _revealAnswer ?? context.s.noAnswerRecorded,
-                        highlights: _item.highlights,
+                    SwipeCard(
+                      key: ValueKey('swipe$_index'),
+                      enabled: showGrades,
+                      leftLabel: context.s.grade(ReviewGrade.again),
+                      rightLabel: context.s.grade(ReviewGrade.good),
+                      onSwipe: (direction) => _grade(direction == SwipeDirection.right
+                          ? ReviewGrade.good
+                          : ReviewGrade.again),
+                      child: FlipCard(
+                        key: _flipKey,
+                        onFlip: (back) {
+                          if (back && !_revealed) {
+                            setState(() => _revealed = true);
+                          }
+                        },
+                        front: _cardFace(
+                          context.s.noteType(_item.type).toUpperCase(),
+                          _prompt,
+                          withImage: _item.hasImage,
+                        ),
+                        back: _cardFace(
+                          context.s.answerLabel,
+                          _revealAnswer ?? context.s.noAnswerRecorded,
+                          highlights: _item.highlights,
+                        ),
                       ),
                     ),
                     const SizedBox(height: 14),
@@ -653,10 +796,18 @@ class _PracticeSessionScreenState
                               ? context.s.skippedViewOnly
                               : context.s.ratedViewOnly(pastGrade))
                           : showGrades
-                              ? context.s.howWell
+                              ? '${context.s.howWell}  ${context.s.swipeHint}'
                               : context.s.tapToFlip,
+                      textAlign: TextAlign.center,
                       style: theme.textTheme.bodySmall,
                     ),
+                    if (_hasKeyboard) ...[
+                      const SizedBox(height: 4),
+                      Text(context.s.keyboardHint,
+                          textAlign: TextAlign.center,
+                          style: theme.textTheme.labelSmall
+                              ?.copyWith(color: theme.colorScheme.outline)),
+                    ],
                   ],
                 ),
               ),
@@ -1424,4 +1575,19 @@ class _PauseBanner extends StatelessWidget {
       ),
     );
   }
+}
+
+/// A grade given this session, kept so it can be undone.
+class _Graded {
+  const _Graded(this.index, this.before, this.grade, this.counted);
+
+  /// The card's place in the queue.
+  final int index;
+
+  /// The note as it was before the grade.
+  final KnowledgeItem before;
+  final ReviewGrade grade;
+
+  /// Whether it raised the session's correct count.
+  final bool counted;
 }

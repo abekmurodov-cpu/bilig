@@ -41,6 +41,8 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
       TextEditingController(text: widget.item.back ?? '');
   late final TextEditingController _category =
       TextEditingController(text: widget.item.category ?? '');
+  late final TextEditingController _tags =
+      TextEditingController(text: widget.item.tags.join(', '));
   late KnowledgeType _type = widget.item.type;
   bool _editing = false;
 
@@ -72,6 +74,7 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
     _front.dispose();
     _back.dispose();
     _category.dispose();
+    _tags.dispose();
     super.dispose();
   }
 
@@ -179,6 +182,7 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
           back: _back.text,
           type: _type,
           category: _category.text,
+          tags: KnowledgeItem.parseTags(_tags.text),
         );
     if (mounted) setState(() => _editing = false);
   }
@@ -289,11 +293,22 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
                 ?.copyWith(fontStyle: FontStyle.italic, color: Colors.grey),
           ),
         const SizedBox(height: 16),
-        if (item.category != null)
-          Chip(
-            avatar: const Icon(Icons.folder_outlined, size: 16),
-            label: Text(item.category!),
-          ),
+        Wrap(
+          spacing: 6,
+          runSpacing: 4,
+          children: [
+            if (item.category != null)
+              Chip(
+                avatar: const Icon(Icons.folder_outlined, size: 16),
+                label: Text(item.category!),
+              ),
+            for (final tag in item.tags)
+              Chip(
+                label: Text('#$tag'),
+                visualDensity: VisualDensity.compact,
+              ),
+          ],
+        ),
         const Divider(height: 28),
         _QuestionsSection(item: item),
       ],
@@ -337,6 +352,16 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
           controller: _category,
           decoration: InputDecoration(
               labelText: context.s.category, border: OutlineInputBorder()),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _tags,
+          decoration: InputDecoration(
+            labelText: context.s.tagsField,
+            hintText: context.s.tagsHint,
+            prefixIcon: const Icon(Icons.sell_outlined),
+            border: const OutlineInputBorder(),
+          ),
         ),
         const SizedBox(height: 12),
         Row(

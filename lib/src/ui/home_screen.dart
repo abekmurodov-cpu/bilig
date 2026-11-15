@@ -6,6 +6,7 @@ import '../providers/knowledge_providers.dart';
 import 'capture_screen.dart';
 import 'widgets/app_logo.dart';
 import 'widgets/item_tile.dart';
+import 'widgets/note_detail_sheet.dart';
 import 'widgets/study_cards.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -55,7 +56,10 @@ class HomeScreen extends ConsumerWidget {
                   padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
                   itemCount: items.length,
                   separatorBuilder: (_, _) => const SizedBox(height: 4),
-                  itemBuilder: (context, i) => ItemTile(item: items[i]),
+                  itemBuilder: (context, i) => ItemTile(
+                    item: items[i],
+                    onTap: () => showNoteDetailSheet(context, items[i]),
+                  ),
                 ),
               ),
             ],

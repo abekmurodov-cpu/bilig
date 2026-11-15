@@ -91,6 +91,7 @@ class KnowledgeItem {
     this.highlights = const [],
     this.stability,
     this.difficulty,
+    this.tags = const [],
   }) : updatedAt = updatedAt ?? createdAt;
 
   final String id;
@@ -106,6 +107,20 @@ class KnowledgeItem {
   final int repetitions;
   final double easeFactor;
   final int intervalDays;
+
+  /// Free labels across categories ("exam1", "hard", "week3"), for search.
+  final List<String> tags;
+
+  /// Cleans typed tags: "#Exam, week 3,exam" → ["Exam", "week 3"].
+  static List<String> parseTags(String text) {
+    final out = <String>[];
+    for (final raw in text.split(RegExp(r'[,\n]'))) {
+      final tag = raw.trim().replaceFirst(RegExp(r'^#+'), '').trim();
+      if (tag.isEmpty || out.any((t) => t.toLowerCase() == tag.toLowerCase())) continue;
+      out.add(tag);
+    }
+    return out;
+  }
 
   /// FSRS memory state: days until recall odds fall to 90%, and how hard
   /// the note is (1–10). Null until the first FSRS review.
@@ -339,6 +354,7 @@ class KnowledgeItem {
     List<String>? highlights,
     double? stability,
     double? difficulty,
+    List<String>? tags,
   }) {
     return KnowledgeItem(
       id: id,
@@ -368,6 +384,7 @@ class KnowledgeItem {
       highlights: highlights ?? this.highlights,
       stability: stability ?? this.stability,
       difficulty: difficulty ?? this.difficulty,
+      tags: tags ?? this.tags,
     );
   }
 
@@ -399,6 +416,7 @@ class KnowledgeItem {
         'highlights': highlights,
         'stability': stability,
         'difficulty': difficulty,
+        'tags': tags,
       };
 
   factory KnowledgeItem.fromMap(Map<String, dynamic> map) => KnowledgeItem(
@@ -446,6 +464,7 @@ class KnowledgeItem {
         quizManual: map['quizManual'] == true,
         stability: (map['stability'] as num?)?.toDouble(),
         difficulty: (map['difficulty'] as num?)?.toDouble(),
+        tags: (map['tags'] as List?)?.map((e) => e.toString()).toList() ?? const [],
         highlights:
             (map['highlights'] as List?)?.map((e) => e.toString()).toList() ??
                 const [],

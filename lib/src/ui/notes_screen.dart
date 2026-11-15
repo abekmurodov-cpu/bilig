@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../l10n/app_strings.dart';
+import '../models/knowledge_item.dart';
+import '../models/note_search.dart';
 import '../providers/knowledge_providers.dart';
 import 'widgets/category_tree.dart';
 import 'widgets/item_tile.dart';
@@ -22,6 +24,16 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   _NotesView _view = _NotesView.list;
   int _visible = _pageSize;
   final _scrollController = ScrollController();
+  final _search = TextEditingController();
+  final Set<String> _tags = {};
+
+  bool get _filtering => _search.text.trim().isNotEmpty || _tags.isNotEmpty;
+
+  /// The notes to show: everything, or the search results.
+  List<KnowledgeItem> _notes() {
+    final all = ref.watch(notesSortedProvider);
+    return _filtering ? searchNotes(all, _search.text, tags: _tags) : all;
+  }
 
   @override
   void initState() {
@@ -32,6 +44,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   @override
   void dispose() {
     _scrollController.dispose();
+    _search.dispose();
     super.dispose();
   }
 
@@ -47,28 +60,81 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final tags = ref.watch(tagsProvider);
     return Scaffold(
       appBar: AppBar(
         title: Text(context.s.navNotes),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(56),
+          preferredSize: Size.fromHeight(tags.isEmpty ? 64 : 108),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-            child: SegmentedButton<_NotesView>(
-              segments: [
-                ButtonSegment(
-                  value: _NotesView.list,
-                  label: Text(context.s.viewList),
-                  icon: Icon(Icons.view_list),
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _search,
+                        onChanged: (_) => setState(() => _visible = _pageSize),
+                        decoration: InputDecoration(
+                          hintText: context.s.searchNotes,
+                          prefixIcon: const Icon(Icons.search),
+                          suffixIcon: _search.text.isEmpty
+                              ? null
+                              : IconButton(
+                                  tooltip: context.s.clear,
+                                  icon: const Icon(Icons.close),
+                                  onPressed: () => setState(_search.clear),
+                                ),
+                          isDense: true,
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(28)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SegmentedButton<_NotesView>(
+                      showSelectedIcon: false,
+                      segments: [
+                        ButtonSegment(
+                          value: _NotesView.list,
+                          tooltip: context.s.viewList,
+                          icon: const Icon(Icons.view_list),
+                        ),
+                        ButtonSegment(
+                          value: _NotesView.tree,
+                          tooltip: context.s.viewTree,
+                          icon: const Icon(Icons.park),
+                        ),
+                      ],
+                      selected: {_view},
+                      onSelectionChanged: (s) => setState(() => _view = s.first),
+                    ),
+                  ],
                 ),
-                ButtonSegment(
-                  value: _NotesView.tree,
-                  label: Text(context.s.viewTree),
-                  icon: Icon(Icons.park),
-                ),
+                if (tags.isNotEmpty)
+                  SizedBox(
+                    height: 44,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.only(top: 6),
+                      children: [
+                        for (final (tag, count) in tags)
+                          Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: FilterChip(
+                              label: Text('#$tag  $count'),
+                              visualDensity: VisualDensity.compact,
+                              selected: _tags.contains(tag.toLowerCase()),
+                              onSelected: (on) => setState(() => on
+                                  ? _tags.add(tag.toLowerCase())
+                                  : _tags.remove(tag.toLowerCase())),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
               ],
-              selected: {_view},
-              onSelectionChanged: (s) => setState(() => _view = s.first),
             ),
           ),
         ),
@@ -81,8 +147,10 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   }
 
   Widget _buildList() {
-    final notes = ref.watch(notesSortedProvider);
-    if (notes.isEmpty) return const _EmptyNotes();
+    final notes = _notes();
+    if (notes.isEmpty) {
+      return _filtering ? _NoResults(query: _search.text) : const _EmptyNotes();
+    }
     final count = _visible.clamp(0, notes.length);
     final hasMore = count < notes.length;
     return ListView.separated(
@@ -107,8 +175,12 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   }
 
   Widget _buildTree() {
-    final groups = ref.watch(notesByCategoryProvider);
-    if (groups.isEmpty) return const _EmptyNotes();
+    final groups = _filtering
+        ? groupByCategory(_notes())
+        : ref.watch(notesByCategoryProvider);
+    if (groups.isEmpty) {
+      return _filtering ? _NoResults(query: _search.text) : const _EmptyNotes();
+    }
     final entries = groups.entries.toList();
     return ListView(
       padding: const EdgeInsets.only(bottom: 24),
@@ -173,6 +245,22 @@ class _EmptyNotes extends StatelessWidget {
             Text(context.s.noNotes),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _NoResults extends StatelessWidget {
+  const _NoResults({required this.query});
+
+  final String query;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Text(context.s.noResults(query.trim()), textAlign: TextAlign.center),
       ),
     );
   }

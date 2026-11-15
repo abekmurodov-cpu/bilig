@@ -13,7 +13,7 @@ import 'widgets/image_picking.dart';
 import 'widgets/item_tile.dart';
 
 /// Where the notes come from.
-enum BulkSource { text, photo }
+enum BulkSource { text, photo, import }
 
 /// Makes many notes at once: from a photo of a page, slide or whiteboard
 /// (read by the AI), or from pasted text (split by the AI, or line by line
@@ -24,11 +24,15 @@ class BulkAddScreen extends ConsumerStatefulWidget {
     required this.source,
     this.initialText,
     this.initialImage,
+    this.initialDrafts,
   });
 
   final BulkSource source;
   final String? initialText;
   final Uint8List? initialImage;
+
+  /// Notes already read from a file (Anki, Quizlet), shown for picking.
+  final List<NoteDraft>? initialDrafts;
 
   @override
   ConsumerState<BulkAddScreen> createState() => _BulkAddScreenState();
@@ -44,10 +48,17 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
   String? _message;
 
   bool get _isPhoto => widget.source == BulkSource.photo;
+  bool get _isImport => widget.source == BulkSource.import;
 
   @override
   void initState() {
     super.initState();
+    final drafts = widget.initialDrafts;
+    if (drafts != null) {
+      // Imported notes keep their own decks as categories.
+      _drafts = drafts;
+      _keep.addAll(List.generate(drafts.length, (i) => i));
+    }
     if (_isPhoto && _image == null) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _pickPhoto());
     }
@@ -184,7 +195,7 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
     setState(() => _busy = true);
     await ref
         .read(knowledgeListProvider.notifier)
-        .addDrafts(chosen, category: _category.text);
+        .addDrafts(chosen, category: _category.text, onlyMissing: _isImport);
     if (!mounted) return;
     Navigator.of(context).pop(chosen.length);
     messenger.showSnackBar(SnackBar(content: Text(strings.savedNotes(chosen.length))));
@@ -196,9 +207,13 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
     final drafts = _drafts;
     return Scaffold(
       appBar: AppBar(
-        title: Text(_isPhoto ? strings.photoToNotes : strings.pasteAndSplit),
+        title: Text(switch (widget.source) {
+          BulkSource.photo => strings.photoToNotes,
+          BulkSource.text => strings.pasteAndSplit,
+          BulkSource.import => strings.importTitle,
+        }),
         actions: [
-          if (drafts != null)
+          if (drafts != null && !_isImport)
             TextButton(
               onPressed: _busy ? null : () => setState(() => _drafts = null),
               child: Text(strings.startOver),
@@ -305,65 +320,99 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
   Widget _buildDrafts(List<NoteDraft> drafts) {
     final strings = context.s;
     final theme = Theme.of(context);
-    return ListView(
+    final all = _keep.length == drafts.length;
+    // Built lazily: an imported deck can hold thousands of notes.
+    return ListView.builder(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
-          child: Text(strings.notesFound(drafts.length),
-              style: theme.textTheme.bodyMedium),
-        ),
-        for (var i = 0; i < drafts.length; i++)
-          Card(
-            margin: const EdgeInsets.only(bottom: 8),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(12),
-              onTap: () => _edit(i),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(4, 8, 12, 8),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Checkbox(
-                      value: _keep.contains(i),
-                      onChanged: (v) => setState(
-                          () => v == true ? _keep.add(i) : _keep.remove(i)),
-                    ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 10),
-                          Text(drafts[i].front,
-                              style: theme.textTheme.titleSmall),
-                          if (drafts[i].back != null) ...[
-                            const SizedBox(height: 4),
-                            Text(drafts[i].back!,
-                                style: theme.textTheme.bodyMedium),
-                          ],
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 6),
-                      child: TypeChip(type: drafts[i].type),
-                    ),
-                  ],
+      itemCount: drafts.length + 2,
+      itemBuilder: (context, i) {
+        if (i == 0) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(4, 0, 0, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(strings.notesFound(drafts.length),
+                      style: theme.textTheme.bodyMedium),
                 ),
+                TextButton(
+                  onPressed: () => setState(() {
+                    all
+                        ? _keep.clear()
+                        : _keep.addAll(List.generate(drafts.length, (i) => i));
+                  }),
+                  child: Text(all ? strings.selectNone : strings.selectAll),
+                ),
+              ],
+            ),
+          );
+        }
+        if (i == drafts.length + 1) {
+          return Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: TextField(
+              controller: _category,
+              decoration: InputDecoration(
+                labelText: _isImport ? strings.categoryForMissing : strings.categoryForAll,
+                prefixIcon: const Icon(Icons.folder_outlined),
+                border: const OutlineInputBorder(),
+              ),
+            ),
+          );
+        }
+        final index = i - 1;
+        final draft = drafts[index];
+        return Card(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(12),
+            onTap: () => _edit(index),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(4, 8, 12, 8),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Checkbox(
+                    value: _keep.contains(index),
+                    onChanged: (v) => setState(
+                        () => v == true ? _keep.add(index) : _keep.remove(index)),
+                  ),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const SizedBox(height: 10),
+                        Text(draft.front,
+                            maxLines: 4,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleSmall),
+                        if (draft.back != null) ...[
+                          const SizedBox(height: 4),
+                          Text(draft.back!,
+                              maxLines: 4,
+                              overflow: TextOverflow.ellipsis,
+                              style: theme.textTheme.bodyMedium),
+                        ],
+                        if (_isImport && draft.category != null) ...[
+                          const SizedBox(height: 4),
+                          Text(draft.category!,
+                              style: theme.textTheme.labelSmall
+                                  ?.copyWith(color: theme.colorScheme.primary)),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 6),
+                    child: TypeChip(type: draft.type),
+                  ),
+                ],
               ),
             ),
           ),
-        const SizedBox(height: 8),
-        TextField(
-          controller: _category,
-          decoration: InputDecoration(
-            labelText: strings.categoryForAll,
-            prefixIcon: const Icon(Icons.folder_outlined),
-            border: const OutlineInputBorder(),
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 }

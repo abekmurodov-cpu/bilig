@@ -12,6 +12,7 @@ import 'src/notifications/notification_service.dart';
 import 'src/providers/knowledge_providers.dart';
 import 'src/providers/settings_providers.dart';
 import 'src/ui/app_shell.dart';
+import 'src/ui/onboarding_screen.dart';
 
 const _seedColor = Color(0xFF5B6CF0);
 
@@ -21,6 +22,11 @@ Future<void> main() async {
   final images = await ImageStore.open();
   final settings = await SettingsRepository.open();
   final secrets = await SecretStore.open(settings);
+  // People who already have notes don't need the first-run tour.
+  if (settings.getString(SettingsRepository.kOnboarded) == null &&
+      (await repository.getAll()).isNotEmpty) {
+    await settings.setString(SettingsRepository.kOnboarded, 'yes');
+  }
   final notifications = NotificationService();
   await notifications.init();
 
@@ -68,7 +74,9 @@ class BiligApp extends ConsumerWidget {
         ),
         useMaterial3: true,
       ),
-      home: const AppShell(),
+      home: ref.watch(onboardedProvider)
+          ? const AppShell()
+          : const OnboardingScreen(),
     );
   }
 }

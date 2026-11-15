@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
 
+import '../data/bilig_file.dart';
 import '../data/image_store.dart';
 import '../data/knowledge_repository.dart';
 import '../llm/llm_provider.dart';
@@ -45,6 +46,7 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
     String? mcAnswer,
     List<String> mcDistractors = const [],
     List<String> highlights = const [],
+    List<String> tags = const [],
   }) async {
     final now = DateTime.now();
     final id = _uuid.v4();
@@ -75,16 +77,19 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
       fillBlankAnswers: drills?.fillBlankAnswers ?? const [],
       reorderSegments: drills?.reorderSegments ?? const [],
       highlights: keptHighlights(highlights, front.trim(), back?.trim()),
+      tags: tags,
     );
     await _repo.save(item);
     await _refresh();
   }
 
   /// Saves several new notes at once (from a photo, a paste or an import),
-  /// with one list refresh. [category] fills in notes that have none.
-  Future<void> addDrafts(List<NoteDraft> drafts, {String? category}) async {
+  /// with one list refresh. A [category] is given to every note, or with
+  /// [onlyMissing] only to notes that have none.
+  Future<void> addDrafts(List<NoteDraft> drafts,
+      {String? category, bool onlyMissing = false}) async {
     final now = DateTime.now();
-    final fallback = category?.trim().isEmpty ?? true ? null : category!.trim();
+    final typed = category?.trim().isEmpty ?? true ? null : category!.trim();
     for (final d in drafts) {
       final back = d.back?.trim();
       final code = d.type == KnowledgeType.code ? back ?? '' : '';
@@ -94,15 +99,71 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
         front: d.front.trim(),
         back: back == null || back.isEmpty ? null : back,
         type: d.type,
-        category: fallback ?? d.category,
+        category: onlyMissing ? (d.category ?? typed) : (typed ?? d.category),
         createdAt: now,
         dueDate: now,
         fillBlankTemplate: drills?.fillBlankTemplate,
         fillBlankAnswers: drills?.fillBlankAnswers ?? const [],
         reorderSegments: drills?.reorderSegments ?? const [],
+        highlights: keptHighlights(d.highlights, d.front, back),
+        tags: d.tags,
       ));
     }
     await _refresh();
+  }
+
+  /// Brings in notes from a .bilig file. A backup restores: notes already
+  /// here keep whichever copy was changed last. A shared file adds copies
+  /// with fresh ids and no progress, skipping notes already present (same
+  /// prompt in the same category). Returns how many notes were added and
+  /// how many were updated.
+  Future<({int added, int updated})> importFile(BiligFile file) async {
+    final current = {
+      for (final i in state.asData?.value ?? const <KnowledgeItem>[]) i.id: i,
+    };
+    String key(KnowledgeItem i) =>
+        '${i.front.trim().toLowerCase()}\u0000${i.category?.trim().toLowerCase()}';
+    final present = {for (final i in current.values) key(i)};
+    var added = 0, updated = 0;
+    for (final note in file.notes) {
+      KnowledgeItem? save;
+      if (file.kind == BiligFileKind.share) {
+        if (!present.add(key(note))) continue;
+        save = KnowledgeItem.fromMap(
+            {...BiligFile.withoutProgress(note).toMap(), 'id': _uuid.v4()});
+        added++;
+      } else {
+        final mine = current[note.id];
+        if (mine == null) {
+          save = note;
+          added++;
+        } else if (note.updatedAt.isAfter(mine.updatedAt)) {
+          save = note;
+          updated++;
+        }
+      }
+      if (save == null) continue;
+      final image = file.images[note.id];
+      if (image != null) await _images.putBase64(save.id, image);
+      // Files carry every image their notes have.
+      await _repo.save(save.copyWith(hasImage: image != null));
+    }
+    await _refresh();
+    return (added: added, updated: updated);
+  }
+
+  /// Deletes every note carrying one of [tags] (e.g. the sample notes).
+  Future<int> deleteTagged(Set<String> tags) async {
+    final doomed = [
+      for (final i in state.asData?.value ?? const <KnowledgeItem>[])
+        if (i.tags.any((t) => tags.contains(t.toLowerCase()))) i.id,
+    ];
+    for (final id in doomed) {
+      await _repo.delete(id);
+      await _images.delete(id);
+    }
+    await _refresh();
+    return doomed.length;
   }
 
   /// Persists an already-built item (bumping [updatedAt] for sync). Used by the
@@ -177,6 +238,7 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
     String? back,
     required KnowledgeType type,
     String? category,
+    List<String>? tags,
   }) async {
     final contentChanged = item.front != front.trim() ||
         (item.back ?? '') != (back?.trim() ?? '') ||
@@ -194,6 +256,7 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
       type: type,
       category: category?.trim().isEmpty ?? true ? null : category!.trim(),
       highlights: keptHighlights(item.highlights, newFront, newBack),
+      tags: tags,
       updatedAt: DateTime.now(),
     );
     await _repo.save(updated);
@@ -250,9 +313,11 @@ final notesSortedProvider = Provider<List<KnowledgeItem>>((ref) {
 /// Notes grouped by category (uncategorized → [kUngroupedCategory]); one entry
 /// per category becomes one tree in the tree view. Categories are alphabetical,
 /// with [kUngroupedCategory] last.
-final notesByCategoryProvider =
-    Provider<Map<String, List<KnowledgeItem>>>((ref) {
-  final items = ref.watch(notesSortedProvider);
+final notesByCategoryProvider = Provider<Map<String, List<KnowledgeItem>>>(
+    (ref) => groupByCategory(ref.watch(notesSortedProvider)));
+
+/// [items] grouped by category, as in [notesByCategoryProvider].
+Map<String, List<KnowledgeItem>> groupByCategory(List<KnowledgeItem> items) {
   final groups = <String, List<KnowledgeItem>>{};
   for (final item in items) {
     final key = (item.category == null || item.category!.trim().isEmpty)
@@ -267,6 +332,22 @@ final notesByCategoryProvider =
       return a.toLowerCase().compareTo(b.toLowerCase());
     });
   return {for (final k in keys) k: groups[k]!};
+}
+
+/// Every tag in use with how many notes carry it, most used first.
+final tagsProvider = Provider<List<(String, int)>>((ref) {
+  final counts = <String, int>{};
+  final names = <String, String>{};
+  for (final item in ref.watch(notesSortedProvider)) {
+    for (final tag in item.tags) {
+      final key = tag.toLowerCase();
+      names.putIfAbsent(key, () => tag);
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+  }
+  final out = [for (final e in counts.entries) (names[e.key]!, e.value)]
+    ..sort((a, b) => b.$2 != a.$2 ? b.$2 - a.$2 : a.$1.compareTo(b.$1));
+  return out;
 });
 
 /// Distinct category names present in the store (excludes the synthetic

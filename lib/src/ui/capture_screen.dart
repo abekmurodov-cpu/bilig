@@ -31,6 +31,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
   late final _backController = HighlightingController()
     ..text = widget.initialBack ?? '';
   final _categoryController = TextEditingController();
+  final _tagsController = TextEditingController();
   KnowledgeType _type = KnowledgeType.concept;
   bool _saving = false;
   bool _aiBusy = false;
@@ -97,6 +98,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
     _frontController.dispose();
     _backController.dispose();
     _categoryController.dispose();
+    _tagsController.dispose();
     super.dispose();
   }
 
@@ -164,6 +166,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
           category: _categoryController.text,
           imageBytes: _imageBytes,
           highlights: _highlights,
+          tags: KnowledgeItem.parseTags(_tagsController.text),
         );
     if (mounted) Navigator.of(context).pop();
   }
@@ -304,6 +307,16 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                     icon: const Icon(Icons.auto_awesome),
                   ),
               ],
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _tagsController,
+              decoration: InputDecoration(
+                labelText: context.s.tagsField,
+                hintText: context.s.tagsHint,
+                prefixIcon: const Icon(Icons.sell_outlined),
+                border: const OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 16),
             if (_imageBytes != null) ...[

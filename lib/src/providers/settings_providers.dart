@@ -51,3 +51,19 @@ class LanguageNotifier extends Notifier<AppLanguage> {
 
 final languageProvider =
     NotifierProvider<LanguageNotifier, AppLanguage>(LanguageNotifier.new);
+
+/// Whether the first-run tour has been seen (or skipped).
+class OnboardedNotifier extends Notifier<bool> {
+  SettingsRepository get _settings => ref.read(settingsRepositoryProvider);
+
+  @override
+  bool build() => _settings.getString(SettingsRepository.kOnboarded) == 'yes';
+
+  Future<void> finish() async {
+    state = true;
+    await _settings.setString(SettingsRepository.kOnboarded, 'yes');
+  }
+}
+
+final onboardedProvider =
+    NotifierProvider<OnboardedNotifier, bool>(OnboardedNotifier.new);

@@ -57,6 +57,8 @@ class NoteDraft {
     this.back,
     this.type = KnowledgeType.concept,
     this.category,
+    this.highlights = const [],
+    this.tags = const [],
   });
 
   final String front;
@@ -64,12 +66,18 @@ class NoteDraft {
   final KnowledgeType type;
   final String? category;
 
+  /// Key ideas already marked (Anki cloze deletions become highlights).
+  final List<String> highlights;
+  final List<String> tags;
+
   NoteDraft copyWith({String? front, String? back, KnowledgeType? type}) =>
       NoteDraft(
         front: front ?? this.front,
         back: back ?? this.back,
         type: type ?? this.type,
         category: category,
+        highlights: highlights,
+        tags: tags,
       );
 }
 

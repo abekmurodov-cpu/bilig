@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_strings.dart';
+import 'data_section.dart';
 import '../llm/ai_services.dart';
 import '../llm/llm_provider.dart';
 import '../llm/llm_providers.dart';
@@ -28,6 +29,7 @@ class SettingsScreen extends ConsumerWidget {
           _LanguageSection(),
           if (!kIsWeb) _RemindersSection(),
           _LlmSection(),
+          DataSection(),
           _TelegramSection(),
         ],
       ),
