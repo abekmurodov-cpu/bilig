@@ -248,6 +248,31 @@ class AppStrings {
         'suggestHighlights' => _t('Suggest key ideas', 'Asosiy g‘oyalar taklifi', 'Ключевые идеи'),
         _ => task,
       };
+  String get fmtBold => _t('Bold', 'Qalin', 'Жирный');
+  String get fmtItalic => _t('Italic', 'Kursiv', 'Курсив');
+  String get fmtHeading => _t('Heading', 'Sarlavha', 'Заголовок');
+  String get fmtBullets => _t('List', 'Ro‘yxat', 'Список');
+  String get fmtNumbers => _t('Numbered list', 'Raqamli ro‘yxat', 'Нумерованный список');
+  String get fmtCode => _t('Code', 'Kod', 'Код');
+  String get fmtCodeBlock => _t('Code block', 'Kod bloki', 'Блок кода');
+  String get fmtFormula => _t('Formula', 'Formula', 'Формула');
+  String get fmtFormulaBlock => _t('Formula on its own line', 'Alohida qatordagi formula',
+      'Формула отдельной строкой');
+  String get formulaHelp => _t('Formula examples', 'Formula namunalari', 'Примеры формул');
+  String get formulaHelpBlurb => _t(
+      'Formulas are written in LaTeX between \$ signs. Tap one to insert it.',
+      'Formulalar \$ belgilari orasida LaTeX tilida yoziladi. Qo‘shish uchun bosing.',
+      'Формулы пишутся на LaTeX между знаками \$. Нажмите, чтобы вставить.');
+  String get preview => _t('Preview', 'Ko‘rinishi', 'Просмотр');
+  String get previewEmpty => _t('Nothing to show yet.', 'Hali ko‘rsatadigan narsa yo‘q.',
+      'Пока нечего показать.');
+  String get readAsPage => _t('Read as a page', 'Sahifa ko‘rinishida', 'Читать страницей');
+  String get exportMarkdown =>
+      _t('Export as Markdown', 'Markdown sifatida saqlash', 'Экспорт в Markdown');
+  String get otherNotes => _t('Other notes', 'Boshqa qaydlar', 'Другие заметки');
+  String get paperOverline => _t('MY NOTES', 'MENING QAYDLARIM', 'МОИ ЗАМЕТКИ');
+  String get paperEmpty => _t('No notes here yet.', 'Bu yerda hali qayd yo‘q.', 'Здесь пока нет заметок.');
+  String get contents => _t('Contents', 'Mundarija', 'Содержание');
   String get allTopics => _t('All topics', 'Barcha mavzular', 'Все темы');
   String get topicOptional =>
       _t('Topic (optional)', 'Mavzu (ixtiyoriy)', 'Тема (необязательно)');

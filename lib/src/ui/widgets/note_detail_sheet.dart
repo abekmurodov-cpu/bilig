@@ -9,10 +9,12 @@ import '../../models/knowledge_item.dart';
 import '../../providers/knowledge_providers.dart';
 import '../../models/highlights.dart';
 import 'category_field.dart';
+import 'format_bar.dart';
 import 'image_picking.dart';
 import 'item_tile.dart';
 import 'markable_text.dart';
 import 'note_image.dart';
+import 'note_text.dart';
 import 'undo_delete.dart';
 
 /// Bottom sheet showing a note's details with quick edit + delete, the
@@ -278,7 +280,7 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
                   ?.copyWith(color: theme.colorScheme.primary)),
           const SizedBox(height: 8),
         ],
-        MarkableText(
+        NoteBody(
           text: item.front,
           highlights: highlights,
           style: theme.textTheme.headlineSmall,
@@ -289,7 +291,7 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
         NoteImage(noteId: item.id),
         const Divider(height: 28),
         if (item.hasAnswer)
-          MarkableText(
+          NoteBody(
             text: item.back!,
             highlights: highlights,
             style: theme.textTheme.bodyLarge,
@@ -355,10 +357,12 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
         TextField(
           controller: _back,
           minLines: 2,
-          maxLines: 6,
+          maxLines: 10,
           decoration: InputDecoration(
               labelText: context.s.answerDetails),
         ),
+        const SizedBox(height: 8),
+        FormatBar(controller: _back),
         const SizedBox(height: 12),
         CategoryField(controller: _category, labelText: context.s.category),
         const SizedBox(height: 12),

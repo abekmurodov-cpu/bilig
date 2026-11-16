@@ -33,7 +33,7 @@ abstract class PromptedLlm implements LlmProvider {
       '- "front": a short cue to recall from: a term, a question, or a '
       'command (max ~15 words).\n'
       '- "back": the answer or explanation, 1-3 sentences (for code, the '
-      'code itself).\n'
+      'code itself). Write formulas in LaTeX between \$ signs.\n'
       '- "category": one short subject label (1-2 words), the same for '
       'related notes.\n'
       '- Write in the same language as the material.\n'
@@ -107,7 +107,9 @@ abstract class PromptedLlm implements LlmProvider {
       'You are helping build a spaced-repetition flashcard. '
       'Give a concise, correct answer/explanation (1-3 sentences) for this '
       '${item.type.label.toLowerCase()} prompt. Write in the same language as '
-      'the prompt. Reply with the answer only, no preamble.\n\n'
+      'the prompt. Reply with the answer only, no preamble. Plain sentences '
+      'are best; use Markdown (**bold**, "- " lists) only where it helps, '
+      'and write any formula in LaTeX between \$ signs, e.g. \$E = mc^2\$.\n\n'
       'Prompt: ${item.front}',
     );
   }

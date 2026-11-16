@@ -10,6 +10,7 @@ import '../../llm/llm_provider.dart';
 import '../../llm/llm_providers.dart';
 import '../../llm/quiz_prep.dart';
 import '../../models/knowledge_item.dart';
+import '../../models/note_format.dart';
 import '../../practice/answer_matching.dart';
 import '../../practice/cloze.dart';
 import '../../practice/code_drills.dart';
@@ -20,10 +21,10 @@ import '../../scheduler/spaced_repetition.dart';
 import '../widgets/code_field.dart';
 import '../widgets/code_highlighter.dart';
 import '../widgets/flip_card.dart';
-import '../widgets/markable_text.dart';
 import '../theme.dart';
 import '../widgets/item_tile.dart';
 import '../widgets/note_image.dart';
+import '../widgets/note_text.dart';
 import 'practice_screen.dart' show methodIcon;
 
 const TextStyle _monoStyle = TextStyle(fontFamily: 'monospace', fontSize: 13, height: 1.4);
@@ -675,7 +676,7 @@ class _PracticeSessionScreenState
           children: [
             _cardLabel(context),
             const SizedBox(height: 14),
-            Text(_prompt, style: theme.textTheme.headlineSmall),
+            NoteBody(text: _prompt, style: theme.textTheme.headlineSmall),
             if (_item.hasImage) ...[
               const SizedBox(height: 12),
               NoteImage(noteId: _item.id),
@@ -779,7 +780,7 @@ class _PracticeSessionScreenState
                                   letterSpacing: 1.2,
                                   color: theme.colorScheme.primary)),
                           const SizedBox(height: 8),
-                          MarkableText(
+                          NoteBody(
                               text: _revealAnswer ?? context.s.noAnswerRecorded,
                               highlights: _item.highlights,
                               style: theme.textTheme.titleMedium),
@@ -924,7 +925,7 @@ class _PracticeSessionScreenState
           NoteImage(noteId: _item.id, maxHeight: 140),
           const SizedBox(height: 14),
         ],
-        MarkableText(
+        NoteBody(
             text: text,
             highlights: highlights,
             style: theme.textTheme.titleLarge,
@@ -1031,7 +1032,7 @@ class _PracticeSessionScreenState
     final strings = context.s;
     final guess = _answerController.text.trim();
     if (guess.isEmpty) return;
-    final expected = _revealAnswer ?? '';
+    final expected = plainText(_revealAnswer ?? '');
     // A clear match needs no AI request.
     if (isConfidentlyCorrect(guess, expected)) {
       await _submitObjective(true);
@@ -1174,7 +1175,7 @@ class _PracticeSessionScreenState
             ),
             if (showAnswer) ...[
               const SizedBox(height: 8),
-              Text(context.s.answerIs(_revealAnswer ?? _correctOption ?? '—')),
+              Text(context.s.answerIs(plainText(_revealAnswer ?? _correctOption ?? '—'))),
             ],
             if (_feedback != null) ...[
               const SizedBox(height: 4),
@@ -1819,7 +1820,7 @@ class _OptionTile extends StatelessWidget {
                           size: 18, color: Colors.white),
                 ),
                 const SizedBox(width: 14),
-                Expanded(child: Text(text, style: theme.textTheme.bodyLarge)),
+                Expanded(child: NoteBody(text: text, style: theme.textTheme.bodyLarge)),
               ],
             ),
           ),

@@ -1,4 +1,5 @@
 import '../models/knowledge_item.dart';
+import '../models/note_format.dart';
 import 'answer_matching.dart';
 
 /// The blank shown in place of the hidden key idea.
@@ -18,7 +19,7 @@ QuizVariant? clozeQuiz(KnowledgeItem item, Iterable<KnowledgeItem> others) {
   final highlights = item.highlights;
   if (highlights.isEmpty) return null;
   final sentences = [
-    for (final s in '${item.front}\n${item.back ?? ''}'.split(_sentenceBreak))
+    for (final s in '${plainText(item.front)}\n${plainText(item.back ?? '')}'.split(_sentenceBreak))
       if (s.trim().isNotEmpty) s.trim(),
   ];
   final start = (item.repetitions + item.lapses) % highlights.length;

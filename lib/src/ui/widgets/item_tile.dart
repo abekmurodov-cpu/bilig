@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../l10n/app_strings.dart';
 import '../../models/knowledge_item.dart';
+import '../../models/note_format.dart';
 import 'category_tree.dart';
 
 /// A note as a card: its kind, prompt and answer, and a line with where it
@@ -63,14 +64,14 @@ class ItemTile extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item.front,
+                    Text(plainText(item.front),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleSmall
                             ?.copyWith(fontWeight: FontWeight.w600, height: 1.3)),
                     const SizedBox(height: 3),
                     Text(
-                      item.hasAnswer ? item.back! : context.s.noAnswerYet,
+                      item.hasAnswer ? plainText(item.back!) : context.s.noAnswerYet,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: item.hasAnswer

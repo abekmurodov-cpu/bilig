@@ -8,6 +8,7 @@ import '../../practice/practice_models.dart';
 import '../../providers/knowledge_providers.dart';
 import '../../providers/navigation.dart';
 import '../capture_screen.dart';
+import '../note_paper_screen.dart';
 import 'category_tree.dart';
 import 'note_detail_sheet.dart';
 import 'share_category.dart';
@@ -200,6 +201,18 @@ class _CategorySheet extends ConsumerWidget {
                 label: Text(strings.viewTree),
               ),
               TextButton.icon(
+                onPressed: notes.isEmpty
+                    ? null
+                    : () {
+                        Navigator.pop(context);
+                        Navigator.of(host).push(MaterialPageRoute(
+                          builder: (_) => NotePaperScreen(category: category),
+                        ));
+                      },
+                icon: const Icon(Icons.menu_book_outlined),
+                label: Text(strings.readAsPage),
+              ),
+              TextButton.icon(
                 onPressed: () {
                   Navigator.pop(context);
                   Navigator.of(host).push(MaterialPageRoute(
@@ -247,6 +260,12 @@ class _CategorySheet extends ConsumerWidget {
                 onPractise: (queue) => practise(queue, topic: t.name),
                 onOpen: () => _seeNotes(context, ref, topic: t.name),
                 onRename: () => _rename(context, ref, topic: t.name),
+                onRead: () {
+                  Navigator.pop(context);
+                  Navigator.of(host).push(MaterialPageRoute(
+                    builder: (_) => NotePaperScreen(category: category, topic: t.name),
+                  ));
+                },
               ),
             if (topics.isNotEmpty && loose.isNotEmpty)
               Padding(
@@ -269,6 +288,7 @@ class _TopicRow extends StatelessWidget {
     required this.onPractise,
     required this.onOpen,
     required this.onRename,
+    required this.onRead,
   });
 
   final String name;
@@ -276,6 +296,7 @@ class _TopicRow extends StatelessWidget {
   final void Function(List<KnowledgeItem>) onPractise;
   final VoidCallback onOpen;
   final VoidCallback onRename;
+  final VoidCallback onRead;
 
   @override
   Widget build(BuildContext context) {
@@ -298,6 +319,11 @@ class _TopicRow extends StatelessWidget {
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
+          IconButton(
+            tooltip: context.s.readAsPage,
+            icon: const Icon(Icons.menu_book_outlined, size: 20),
+            onPressed: onRead,
+          ),
           IconButton(
             tooltip: context.s.renameTopic,
             icon: const Icon(Icons.edit_outlined, size: 20),

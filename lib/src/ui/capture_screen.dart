@@ -11,6 +11,7 @@ import '../providers/knowledge_providers.dart';
 import 'bulk_add_screen.dart';
 import 'widgets/image_picking.dart';
 import 'widgets/category_field.dart';
+import 'widgets/format_bar.dart';
 import 'widgets/markable_text.dart';
 import 'widgets/voice_input.dart';
 
@@ -276,6 +277,8 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                 suffixIcon: VoiceButton(controller: _backController),
               ),
             ),
+            const SizedBox(height: 8),
+            FormatBar(controller: _backController),
             if (aiAttached) ...[
               const SizedBox(height: 8),
               Align(

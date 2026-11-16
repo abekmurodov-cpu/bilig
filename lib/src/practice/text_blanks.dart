@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import '../models/highlights.dart';
 import '../models/knowledge_item.dart';
+import '../models/note_format.dart';
 import 'answer_matching.dart';
 import 'code_drills.dart';
 
@@ -74,8 +75,10 @@ final _word = RegExp(r"[\p{L}\p{N}]+(?:['’‘ʻ\-][\p{L}\p{N}]+)*", unicode: t
 /// The words asked rotate with every review. Null when the note is too short
 /// to leave enough around a blank to recall it from.
 TextBlanks? textBlanks(KnowledgeItem item, {WordStats? stats}) {
-  final back = item.back?.trim() ?? '';
-  final front = item.front.trim();
+  // Blanks go in the words alone: formatting marks and formulas would make
+  // odd blanks.
+  final back = plainText(item.back ?? '').trim();
+  final front = plainText(item.front).trim();
   // The answer is the passage when there is one, with the front as its cue.
   final passages = [
     if (back.isNotEmpty) (cue: front.isEmpty ? null : front, text: back),
