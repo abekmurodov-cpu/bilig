@@ -26,3 +26,13 @@ class NotesFilterRequest extends Notifier<Set<String>?> {
 
 final notesFilterRequestProvider =
     NotifierProvider<NotesFilterRequest, Set<String>?>(NotesFilterRequest.new);
+
+/// Asks Notes to focus its search box (⌘F).
+class NotesSearchFocus extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  void request() => state++;
+}
+
+final notesSearchFocusProvider = NotifierProvider<NotesSearchFocus, int>(NotesSearchFocus.new);

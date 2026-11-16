@@ -14,6 +14,7 @@ import 'widgets/category_field.dart';
 import 'widgets/format_bar.dart';
 import 'widgets/markable_text.dart';
 import 'widgets/voice_input.dart';
+import 'theme.dart';
 
 class CaptureScreen extends ConsumerStatefulWidget {
   const CaptureScreen({
@@ -209,7 +210,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
     final aiAttached = ref.watch(llmProvider) != null;
     return Scaffold(
       appBar: AppBar(title: Text(context.s.captureTitle)),
-      body: Form(
+      body: ReadableWidth(child: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16),
@@ -368,7 +369,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 }

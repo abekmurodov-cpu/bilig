@@ -15,6 +15,7 @@ import '../providers/knowledge_providers.dart';
 import '../providers/settings_providers.dart';
 import '../sync/sync_providers.dart';
 import '../sync/telegram_sync_service.dart';
+import 'theme.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -23,7 +24,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       appBar: AppBar(title: Text(context.s.navSettings)),
-      body: ListView(
+      body: ReadableWidth(child: ListView(
         padding: const EdgeInsets.fromLTRB(0, 4, 0, 24),
         children: const [
           _ThemeSection(),
@@ -33,7 +34,7 @@ class SettingsScreen extends ConsumerWidget {
           DataSection(),
           _TelegramSection(),
         ],
-      ),
+      )),
     );
   }
 }

@@ -25,20 +25,26 @@ Future<void> showNoteDetailSheet(BuildContext context, KnowledgeItem item) {
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
-    builder: (_) => _NoteDetailSheet(item: item),
+    builder: (_) => NoteDetailView(item: item),
   );
 }
 
-class _NoteDetailSheet extends ConsumerStatefulWidget {
-  const _NoteDetailSheet({required this.item});
+/// A note's details, edit, marker and questions: in a bottom sheet, or
+/// [embedded] beside the notes list on wide screens.
+class NoteDetailView extends ConsumerStatefulWidget {
+  const NoteDetailView({super.key, required this.item, this.embedded = false, this.onDeleted});
 
   final KnowledgeItem item;
+  final bool embedded;
+
+  /// Called after the note is deleted when [embedded] (a sheet closes itself).
+  final VoidCallback? onDeleted;
 
   @override
-  ConsumerState<_NoteDetailSheet> createState() => _NoteDetailSheetState();
+  ConsumerState<NoteDetailView> createState() => _NoteDetailSheetState();
 }
 
-class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
+class _NoteDetailSheetState extends ConsumerState<NoteDetailView> {
   late final TextEditingController _front =
       TextEditingController(text: widget.item.front);
   late final TextEditingController _back =
@@ -200,7 +206,11 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
     final messenger = ScaffoldMessenger.of(context);
     final store = ref.read(knowledgeListProvider.notifier);
     final deleted = await store.deleteMany({widget.item.id});
-    if (mounted) Navigator.of(context).pop();
+    if (widget.embedded) {
+      widget.onDeleted?.call();
+    } else if (mounted) {
+      Navigator.of(context).pop();
+    }
     showUndoDelete(messenger, strings, store, deleted);
   }
 
@@ -217,7 +227,8 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
     _latest = item;
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(20, 4, 20, 20 + bottomInset),
+      padding: EdgeInsets.fromLTRB(
+          widget.embedded ? 28 : 20, widget.embedded ? 24 : 4, widget.embedded ? 28 : 20, 20 + bottomInset),
       child: _editing ? _buildEdit() : _buildView(item),
     );
   }

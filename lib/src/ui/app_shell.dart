@@ -1,4 +1,9 @@
 import 'dart:async';
+import 'dart:convert';
+
+import 'package:desktop_drop/desktop_drop.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,6 +22,7 @@ import 'capture_screen.dart';
 import 'data_section.dart';
 import 'home_screen.dart';
 import 'notes_screen.dart';
+import 'widgets/app_logo.dart';
 import 'practice/practice_screen.dart';
 import 'settings_screen.dart';
 
@@ -118,61 +124,295 @@ class _AppShellState extends ConsumerState<AppShell> {
     ref.listen(quizPrepProvider, (_, _) {});
     ref.listen(knowledgeListProvider, (_, _) => _scheduleSignals());
     final tab = ref.watch(shellTabProvider);
+    final stack = IndexedStack(
+      index: tab,
+      children: [
+        // Hidden tabs stay alive but stop animating (the swaying trees).
+        for (var i = 0; i < _tabs.length; i++)
+          TickerMode(enabled: i == tab, child: _tabs[i]),
+      ],
+    );
+    return _Shortcuts(
+      onCapture: _openCapture,
+      child: _DropZone(
+        onDrop: _openDropped,
+        child: LayoutBuilder(
+          builder: (context, box) => box.maxWidth >= wideLayout
+              ? Scaffold(
+                  body: Row(
+                    children: [
+                      _Rail(tab: tab, extended: box.maxWidth >= 1200, onCapture: _openCapture),
+                      const VerticalDivider(width: 1),
+                      Expanded(child: stack),
+                    ],
+                  ),
+                )
+              : Scaffold(body: stack, bottomNavigationBar: _BottomBar(tab: tab, onCapture: _openCapture)),
+        ),
+      ),
+    );
+  }
+
+  void _openCapture() => Navigator.of(context)
+      .push(MaterialPageRoute(builder: (_) => const CaptureScreen()));
+
+  /// Files dropped on the window: a picture becomes notes, a notes file or
+  /// deck is opened, and text is split into notes.
+  Future<void> _openDropped(List<(String, Uint8List)> files) async {
+    for (final (name, bytes) in files) {
+      if (!mounted) return;
+      final lower = name.toLowerCase();
+      if (RegExp(r'\.(png|jpe?g|webp|heic|gif)$').hasMatch(lower)) {
+        await openBulkAdd(context, BulkSource.photo, image: bytes);
+      } else if (RegExp(r'\.(md|markdown)$').hasMatch(lower)) {
+        await openBulkAdd(context, BulkSource.text, text: utf8.decode(bytes, allowMalformed: true));
+      } else {
+        await openNotesFile(context, ref, name, bytes);
+      }
+    }
+  }
+}
+
+/// Wider than this (a Mac window, a tablet), the tabs move to a side rail.
+const double wideLayout = 840;
+
+class _BottomBar extends ConsumerWidget {
+  const _BottomBar({required this.tab, required this.onCapture});
+
+  final int tab;
+  final VoidCallback onCapture;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     // The bar has Capture in the middle: it opens a screen, not a tab.
     const capture = 2;
-    return Scaffold(
-      body: IndexedStack(
-        index: tab,
-        children: [
-          // Hidden tabs stay alive but stop animating (the swaying trees).
-          for (var i = 0; i < _tabs.length; i++)
-            TickerMode(enabled: i == tab, child: _tabs[i]),
-        ],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: tab < capture ? tab : tab + 1,
-        onDestinationSelected: (i) {
-          if (i == capture) {
-            Navigator.of(context)
-                .push(MaterialPageRoute(builder: (_) => const CaptureScreen()));
-          } else {
-            ref.read(shellTabProvider.notifier).go(i < capture ? i : i - 1);
-          }
-        },
-        destinations: [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: context.s.navHome,
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.park_outlined),
-            selectedIcon: Icon(Icons.park),
-            label: context.s.navNotes,
-          ),
-          NavigationDestination(
-            icon: Container(
-              width: 52,
-              height: 36,
-              decoration: BoxDecoration(
-                color: scheme.primary,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(Icons.add, color: scheme.onPrimary),
+    return NavigationBar(
+      selectedIndex: tab < capture ? tab : tab + 1,
+      onDestinationSelected: (i) {
+        if (i == capture) {
+          onCapture();
+        } else {
+          ref.read(shellTabProvider.notifier).go(i < capture ? i : i - 1);
+        }
+      },
+      destinations: [
+        NavigationDestination(
+          icon: const Icon(Icons.home_outlined),
+          selectedIcon: const Icon(Icons.home),
+          label: context.s.navHome,
+        ),
+        NavigationDestination(
+          icon: const Icon(Icons.park_outlined),
+          selectedIcon: const Icon(Icons.park),
+          label: context.s.navNotes,
+        ),
+        NavigationDestination(
+          icon: Container(
+            width: 52,
+            height: 36,
+            decoration: BoxDecoration(
+              color: scheme.primary,
+              borderRadius: BorderRadius.circular(14),
             ),
-            label: context.s.capture,
+            child: Icon(Icons.add, color: scheme.onPrimary),
           ),
-          NavigationDestination(
-            icon: Icon(Icons.fitness_center_outlined),
-            selectedIcon: Icon(Icons.fitness_center),
-            label: context.s.navPractice,
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings),
-            label: context.s.navSettings,
-          ),
+          label: context.s.capture,
+        ),
+        NavigationDestination(
+          icon: const Icon(Icons.fitness_center_outlined),
+          selectedIcon: const Icon(Icons.fitness_center),
+          label: context.s.navPractice,
+        ),
+        NavigationDestination(
+          icon: const Icon(Icons.settings_outlined),
+          selectedIcon: const Icon(Icons.settings),
+          label: context.s.navSettings,
+        ),
+      ],
+    );
+  }
+}
+
+/// The tabs down the side on wide screens, with Capture on top.
+class _Rail extends ConsumerWidget {
+  const _Rail({required this.tab, required this.extended, required this.onCapture});
+
+  final int tab;
+  final bool extended;
+  final VoidCallback onCapture;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final strings = context.s;
+    final scheme = Theme.of(context).colorScheme;
+    return NavigationRail(
+      extended: extended,
+      minExtendedWidth: 210,
+      backgroundColor: scheme.surfaceContainerLow,
+      selectedIndex: tab,
+      onDestinationSelected: (i) => ref.read(shellTabProvider.notifier).go(i),
+      leading: Padding(
+        padding: const EdgeInsets.only(top: 8, bottom: 16),
+        child: Column(
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const AppLogo(size: 36),
+                if (extended) ...[
+                  const SizedBox(width: 10),
+                  Text('Bilig', style: Theme.of(context).textTheme.titleLarge),
+                ],
+              ],
+            ),
+            const SizedBox(height: 18),
+            Tooltip(
+              message: '${strings.capture}  (${_mod()}N)',
+              child: extended
+                  ? FloatingActionButton.extended(
+                      heroTag: 'capture',
+                      elevation: 0,
+                      onPressed: onCapture,
+                      icon: const Icon(Icons.add),
+                      label: Text(strings.capture),
+                    )
+                  : FloatingActionButton(
+                      heroTag: 'capture',
+                      elevation: 0,
+                      onPressed: onCapture,
+                      child: const Icon(Icons.add),
+                    ),
+            ),
+          ],
+        ),
+      ),
+      destinations: [
+        NavigationRailDestination(
+          icon: const Icon(Icons.home_outlined),
+          selectedIcon: const Icon(Icons.home),
+          label: Text(strings.navHome),
+        ),
+        NavigationRailDestination(
+          icon: const Icon(Icons.park_outlined),
+          selectedIcon: const Icon(Icons.park),
+          label: Text(strings.navNotes),
+        ),
+        NavigationRailDestination(
+          icon: const Icon(Icons.fitness_center_outlined),
+          selectedIcon: const Icon(Icons.fitness_center),
+          label: Text(strings.navPractice),
+        ),
+        NavigationRailDestination(
+          icon: const Icon(Icons.settings_outlined),
+          selectedIcon: const Icon(Icons.settings),
+          label: Text(strings.navSettings),
+        ),
+      ],
+    );
+  }
+}
+
+bool get _isMac => defaultTargetPlatform == TargetPlatform.macOS;
+
+/// "⌘" on a Mac, "Ctrl+" elsewhere.
+String _mod() => _isMac ? '⌘' : 'Ctrl+';
+
+/// Keyboard shortcuts anywhere in the app: ⌘N new note, ⌘F search notes,
+/// ⌘1–4 switch tabs (Ctrl on other systems).
+class _Shortcuts extends ConsumerWidget {
+  const _Shortcuts({required this.child, required this.onCapture});
+
+  final Widget child;
+  final VoidCallback onCapture;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    SingleActivator key(LogicalKeyboardKey k) =>
+        SingleActivator(k, meta: _isMac, control: !_isMac);
+    void tab(int i) => ref.read(shellTabProvider.notifier).go(i);
+    return CallbackShortcuts(
+      bindings: {
+        key(LogicalKeyboardKey.keyN): onCapture,
+        key(LogicalKeyboardKey.keyF): () {
+          tab(ShellTab.notes);
+          ref.read(notesSearchFocusProvider.notifier).request();
+        },
+        key(LogicalKeyboardKey.digit1): () => tab(ShellTab.home),
+        key(LogicalKeyboardKey.digit2): () => tab(ShellTab.notes),
+        key(LogicalKeyboardKey.digit3): () => tab(ShellTab.practice),
+        key(LogicalKeyboardKey.digit4): () => tab(ShellTab.settings),
+      },
+      child: Focus(autofocus: true, child: child),
+    );
+  }
+}
+
+/// On desktops, files can be dropped on the window to make notes.
+class _DropZone extends StatefulWidget {
+  const _DropZone({required this.child, required this.onDrop});
+
+  final Widget child;
+  final Future<void> Function(List<(String, Uint8List)> files) onDrop;
+
+  @override
+  State<_DropZone> createState() => _DropZoneState();
+}
+
+class _DropZoneState extends State<_DropZone> {
+  bool _over = false;
+
+  static bool get _desktop =>
+      !kIsWeb &&
+      const {TargetPlatform.macOS, TargetPlatform.windows, TargetPlatform.linux}
+          .contains(defaultTargetPlatform);
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_desktop) return widget.child;
+    final scheme = Theme.of(context).colorScheme;
+    return DropTarget(
+      onDragEntered: (_) => setState(() => _over = true),
+      onDragExited: (_) => setState(() => _over = false),
+      onDragDone: (details) async {
+        setState(() => _over = false);
+        final files = [
+          for (final f in details.files) (f.name, await f.readAsBytes()),
+        ];
+        await widget.onDrop(files);
+      },
+      child: Stack(
+        children: [
+          widget.child,
+          if (_over)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Container(
+                  color: scheme.primary.withValues(alpha: 0.08),
+                  alignment: Alignment.center,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 22),
+                    decoration: BoxDecoration(
+                      color: scheme.surface,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: scheme.primary, width: 2),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.file_download_outlined, size: 40, color: scheme.primary),
+                        const SizedBox(height: 8),
+                        Text(context.s.dropToAdd,
+                            style: Theme.of(context).textTheme.titleMedium),
+                        const SizedBox(height: 4),
+                        Text(context.s.dropKinds,
+                            style: Theme.of(context).textTheme.bodySmall),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );

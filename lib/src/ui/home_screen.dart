@@ -13,6 +13,7 @@ import 'widgets/forest_view.dart';
 import 'widgets/item_tile.dart';
 import 'widgets/note_detail_sheet.dart';
 import 'widgets/study_cards.dart';
+import 'theme.dart';
 
 /// How many notes each Home section lists.
 const int _sectionSize = 5;
@@ -46,7 +47,7 @@ class HomeScreen extends ConsumerWidget {
           const SizedBox(width: 4),
         ],
       ),
-      body: itemsAsync.when(
+      body: ReadableWidth(maxWidth: 860, child: itemsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text(strings.somethingWentWrong(e))),
         data: (items) {
@@ -85,7 +86,7 @@ class HomeScreen extends ConsumerWidget {
             ],
           );
         },
-      ),
+      )),
     );
   }
 

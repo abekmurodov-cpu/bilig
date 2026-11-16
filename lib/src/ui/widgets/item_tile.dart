@@ -15,8 +15,12 @@ class ItemTile extends StatelessWidget {
     this.onTap,
     this.onLongPress,
     this.selected,
+    this.selectedInPane = false,
     this.showCategory = true,
   });
+
+  /// Open beside the list (wide screens).
+  final bool selectedInPane;
 
   final KnowledgeItem item;
   final VoidCallback? onTap;
@@ -36,7 +40,11 @@ class ItemTile extends StatelessWidget {
     final (statusColor, status) = _status(context);
     final chosen = selected ?? false;
     return Card(
-      color: chosen ? scheme.primaryContainer : null,
+      color: chosen
+          ? scheme.primaryContainer
+          : selectedInPane
+              ? scheme.secondaryContainer
+              : null,
       shape: chosen
           ? RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(18),

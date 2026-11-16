@@ -12,6 +12,7 @@ import '../providers/knowledge_providers.dart';
 import 'widgets/category_field.dart';
 import 'widgets/image_picking.dart';
 import 'widgets/item_tile.dart';
+import 'theme.dart';
 
 /// Where the notes come from.
 enum BulkSource { text, photo, import }
@@ -223,7 +224,7 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
             ),
         ],
       ),
-      body: drafts == null ? _buildInput() : _buildDrafts(drafts),
+      body: ReadableWidth(child: drafts == null ? _buildInput() : _buildDrafts(drafts)),
       bottomNavigationBar: drafts == null
           ? null
           : SafeArea(

@@ -28,6 +28,10 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   int _visible = _pageSize;
   final _scrollController = ScrollController();
   final _search = TextEditingController();
+  final _searchFocus = FocusNode();
+
+  /// On wide screens, the note open beside the list.
+  String? _openId;
   final Set<String> _tags = {};
 
   /// Chosen categories ('' stands for notes without one) and topics; none
@@ -126,6 +130,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
   void dispose() {
     _scrollController.dispose();
     _search.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -161,6 +166,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
       });
       ref.read(notesFilterRequestProvider.notifier).clear();
     });
+    ref.listen(notesSearchFocusProvider, (_, _) => _searchFocus.requestFocus());
     final tags = ref.watch(tagsProvider);
     final groups = ref.watch(notesByCategoryProvider);
     final total = ref.watch(notesSortedProvider).length;
@@ -212,6 +218,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
               children: [
                 TextField(
                   controller: _search,
+                  focusNode: _searchFocus,
                   onChanged: (_) => setState(() => _visible = _pageSize),
                   decoration: InputDecoration(
                     hintText: strings.searchNotesCount(total),
@@ -275,13 +282,45 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
         ),
       ),
       body: switch (_view) {
-        _NotesView.list => _buildList(),
+        _NotesView.list => LayoutBuilder(
+            builder: (context, box) {
+              if (box.maxWidth < _twoPaneWidth) return _buildList(wide: false);
+              final open = _openId == null
+                  ? null
+                  : ref.watch(notesSortedProvider).where((n) => n.id == _openId).firstOrNull;
+              return Row(
+                children: [
+                  SizedBox(width: 420, child: _buildList(wide: true)),
+                  const VerticalDivider(width: 1),
+                  Expanded(
+                    child: open == null
+                        ? _NoNoteOpen()
+                        : Align(
+                            alignment: Alignment.topLeft,
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 780),
+                              child: NoteDetailView(
+                                key: ValueKey(open.id),
+                                item: open,
+                                embedded: true,
+                                onDeleted: () => setState(() => _openId = null),
+                              ),
+                            ),
+                          ),
+                  ),
+                ],
+              );
+            },
+          ),
         _NotesView.tree => _buildTree(),
       },
     );
   }
 
-  Widget _buildList() {
+  /// Wider than this, the open note shows beside the list.
+  static const double _twoPaneWidth = 900;
+
+  Widget _buildList({required bool wide}) {
     final notes = _notes();
     if (notes.isEmpty) {
       return _filtering ? _NoResults(query: _search.text) : const _EmptyNotes();
@@ -319,7 +358,10 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
           onLongPress: () => _toggleSelected(item.id),
           onTap: choosing
               ? () => _toggleSelected(item.id)
-              : () => showNoteDetailSheet(context, item),
+              : wide
+                  ? () => setState(() => _openId = item.id)
+                  : () => showNoteDetailSheet(context, item),
+          selectedInPane: wide && _openId == item.id,
         );
       },
     );
@@ -491,6 +533,23 @@ class _CategoryFilter extends StatelessWidget {
         visualDensity: VisualDensity.compact,
         selected: selected.isNotEmpty,
         onSelected: (_) => menu.isOpen ? menu.close() : menu.open(),
+      ),
+    );
+  }
+}
+
+class _NoNoteOpen extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.sticky_note_2_outlined, size: 56, color: scheme.outlineVariant),
+          const SizedBox(height: 12),
+          Text(context.s.pickANote, style: TextStyle(color: scheme.onSurfaceVariant)),
+        ],
       ),
     );
   }

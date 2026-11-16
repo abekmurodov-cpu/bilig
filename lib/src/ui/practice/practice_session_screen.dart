@@ -549,7 +549,7 @@ class _PracticeSessionScreenState
             ),
         ],
       ),
-      body: Focus(
+      body: ReadableWidth(maxWidth: 800, child: Focus(
         autofocus: true,
         onKeyEvent: _onKey,
         child: done
@@ -560,7 +560,7 @@ class _PracticeSessionScreenState
                   Expanded(child: _buildBody()),
                 ],
               ),
-      ),
+      )),
     );
   }
 

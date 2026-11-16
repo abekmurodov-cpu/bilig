@@ -6,6 +6,7 @@ import '../../llm/llm_providers.dart';
 import '../../practice/practice_models.dart';
 import '../../providers/knowledge_providers.dart';
 import 'practice_session_screen.dart';
+import '../theme.dart';
 
 /// Setup screen for a practice run: pick a method and a scope, then start.
 class PracticeScreen extends ConsumerStatefulWidget {
@@ -102,7 +103,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(strings.navPractice)),
-      body: ListView(
+      body: ReadableWidth(maxWidth: 900, child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         children: [
           heading(strings.method),
@@ -184,9 +185,9 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
             ],
           ],
         ],
-      ),
+      )),
       bottomNavigationBar: SafeArea(
-        child: Padding(
+        child: ReadableWidth(maxWidth: 900, child: Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
           child: FilledButton.icon(
             onPressed: cards == 0 ? null : _start,
@@ -197,7 +198,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
                     ? strings.noMatch
                     : strings.startCards(cards)),
           ),
-        ),
+        ),)
       ),
     );
   }

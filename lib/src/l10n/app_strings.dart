@@ -273,6 +273,13 @@ class AppStrings {
   String get paperOverline => _t('MY NOTES', 'MENING QAYDLARIM', 'МОИ ЗАМЕТКИ');
   String get paperEmpty => _t('No notes here yet.', 'Bu yerda hali qayd yo‘q.', 'Здесь пока нет заметок.');
   String get contents => _t('Contents', 'Mundarija', 'Содержание');
+  String get dropToAdd => _t('Drop to add notes', 'Qayd qo‘shish uchun tashlang',
+      'Отпустите, чтобы добавить заметки');
+  String get dropKinds => _t('Photos, text or Markdown, Anki decks, .bilig files',
+      'Rasmlar, matn yoki Markdown, Anki to‘plamlari, .bilig fayllari',
+      'Фото, текст или Markdown, колоды Anki, файлы .bilig');
+  String get pickANote => _t('Pick a note to see it here', 'Bu yerda ko‘rish uchun qaydni tanlang',
+      'Выберите заметку, чтобы открыть её здесь');
   String get allTopics => _t('All topics', 'Barcha mavzular', 'Все темы');
   String get topicOptional =>
       _t('Topic (optional)', 'Mavzu (ixtiyoriy)', 'Тема (необязательно)');

@@ -7,6 +7,7 @@ import '../l10n/app_strings.dart';
 import '../providers/knowledge_providers.dart';
 import '../providers/stats.dart';
 import '../providers/study_providers.dart';
+import 'theme.dart';
 
 /// Activity calendar steps, empty → most reviews (one hue, light → dark;
 /// green to match the trees). Dark mode has its own steps, dark → bright.
@@ -29,7 +30,7 @@ class StatsScreen extends ConsumerWidget {
     final best = math.max(longestStreak(activity), streak);
     return Scaffold(
       appBar: AppBar(title: Text(strings.progress)),
-      body: ListView(
+      body: ReadableWidth(maxWidth: 860, child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
         children: [
           Row(
@@ -67,7 +68,7 @@ class StatsScreen extends ConsumerWidget {
             child: _UpcomingBars(counts: upcomingReviews(notes)),
           ),
         ],
-      ),
+      )),
     );
   }
 }
