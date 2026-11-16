@@ -371,33 +371,92 @@ abstract class PromptedLlm implements LlmProvider {
     return parseHighlights(item, [for (final h in list) '$h']);
   }
 
-  /// Most notes sent in one "sort into topics" request.
-  static const int maxNotesToSort = 150;
+  /// Most notes sorted into topics at once.
+  static const int maxNotesToSort = 300;
+
+  /// Notes per request when sorting: small requests stay quick and within
+  /// free-tier limits.
+  static const int sortBatch = 50;
+
+  /// A note as one short line for sorting: the cue and the start of the
+  /// answer are enough to tell its topic.
+  static String _sortLine(int number, KnowledgeItem n, {bool withBack = true}) {
+    String clip(String t, int max) {
+      final one = t.replaceAll(RegExp(r'\s+'), ' ').trim();
+      return one.length <= max ? one : '${one.substring(0, max)}…';
+    }
+
+    final back = withBack && n.back != null ? ' — ${clip(n.back!, 60)}' : '';
+    return '$number. ${clip(n.front, 80)}$back';
+  }
 
   @override
   Future<Map<String, String>> suggestTopics(
       String category, List<KnowledgeItem> notes) async {
-    final batch = notes.take(maxNotesToSort).toList();
-    final existing = {for (final n in batch) if (n.topic != null) n.topic!};
-    final list = StringBuffer();
-    for (var i = 0; i < batch.length; i++) {
-      final n = batch[i];
-      final back = n.back == null ? '' : ' — ${_clip(n.back!.replaceAll('\n', ' '))}';
-      list.writeln('${i + 1}. ${_clip(n.front.replaceAll('\n', ' '))}$back');
+    final all = notes.take(maxNotesToSort).toList();
+    final existing = {for (final n in all) if (n.topic != null) n.topic!};
+    final reuse = existing.isEmpty
+        ? ''
+        : ' Reuse these existing topic names where they fit: ${existing.join(', ')}.';
+    const naming = 'Topic names: 1-3 words, Title Case, in the language of the notes.';
+    // Plain lines rather than JSON: long JSON lists trip some models up (and
+    // Groq's strict JSON check).
+    String assign(List<KnowledgeItem> batch, String topicsRule) =>
+        'A student\'s course "$category" has the numbered notes below. '
+        '$topicsRule Every note gets exactly one topic.\n'
+        'Reply with one line per topic and nothing else, in this form:\n'
+        'Topic name: 1, 4, 7\n\n'
+        'Notes:\n${[for (var i = 0; i < batch.length; i++) _sortLine(i + 1, batch[i])].join('\n')}';
+
+    if (all.length <= sortBatch) {
+      final raw = await complete(assign(all,
+          'Group them into 3-8 topics (sections of the course a student would study separately). $naming$reuse'));
+      return parseTopics(all, raw);
     }
-    // Plain lines rather than JSON: with many notes, some models (and
-    // Groq's strict JSON check) trip over long JSON lists.
-    final raw = await complete(
-      'A student\'s course "$category" has the numbered notes below. Group them '
-      'into 3-8 topics (sections of the course a student would study separately). '
-      'Topic names: 1-3 words, Title Case, in the language of the notes.'
-      '${existing.isEmpty ? '' : ' Reuse these existing topic names where they fit: ${existing.join(', ')}.'}'
-      ' Every note gets exactly one topic.\n'
-      'Reply with one line per topic and nothing else, in this form:\n'
-      'Topic name: 1, 4, 7\n\n'
-      'Notes:\n$list',
+
+    // Many notes: first settle the topics from every cue, then sort the notes
+    // into them a batch at a time.
+    final namesRaw = await complete(
+      'A student\'s course "$category" has the notes below. Name 3-8 topics '
+      '(sections of the course a student would study separately) that cover '
+      'them all. $naming$reuse\n'
+      'Reply with the topic names only, one per line.\n\n'
+      'Notes:\n${[for (var i = 0; i < all.length; i++) _sortLine(i + 1, all[i], withBack: false)].join('\n')}',
     );
-    return parseTopics(batch, raw);
+    final names = parseTopicNames(namesRaw);
+    if (names.isEmpty) {
+      throw const LlmException(LlmErrorKind.badResponse, 'The AI returned no topics');
+    }
+    final out = <String, String>{};
+    for (var from = 0; from < all.length; from += sortBatch) {
+      final batch = all.sublist(from, (from + sortBatch).clamp(0, all.length));
+      final raw = await complete(assign(batch,
+          'Put each note in one of these topics: ${names.join(', ')}.'));
+      try {
+        out.addAll(parseTopics(batch, raw));
+      } on LlmException {
+        // A batch the AI fumbled stays without a topic; the rest still count.
+      }
+    }
+    if (out.isEmpty) {
+      throw const LlmException(LlmErrorKind.badResponse, 'The AI returned no topics');
+    }
+    return out;
+  }
+
+  /// Topic names, one per line, without numbering or bullets.
+  static List<String> parseTopicNames(String raw) {
+    final out = <String>[];
+    for (final l in raw.split('\n')) {
+      final name = l
+          .replaceFirst(RegExp(r'^[\s\-*#•\d.)]*'), '')
+          .replaceAll('*', '')
+          .replaceFirst(RegExp(r'[:：].*$'), '')
+          .trim();
+      if (name.isEmpty || name.length > 40 || name.split(' ').length > 5) continue;
+      if (!out.any((o) => o.toLowerCase() == name.toLowerCase())) out.add(name);
+    }
+    return out.take(10).toList();
   }
 
   /// Note id → topic from the AI's reply: "Topic: 1, 4, 7" lines (or the

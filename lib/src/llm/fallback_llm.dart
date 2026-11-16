@@ -17,6 +17,9 @@ class FallbackLlm implements LlmProvider {
   final DateTime Function() _now;
   DateTime? _primaryRestsUntil;
 
+  /// Why the primary was last set aside, to report if the backup fails too.
+  LlmException? _primaryError;
+
   /// Whether requests currently go to the backup.
   bool get usingBackup {
     final until = _primaryRestsUntil;
@@ -31,13 +34,31 @@ class FallbackLlm implements LlmProvider {
       };
 
   Future<T> _run<T>(Future<T> Function(LlmProvider llm) task) async {
-    if (usingBackup) return task(backup);
+    if (usingBackup) return _onBackup(task);
     try {
       return await task(primary);
     } on LlmException catch (e) {
       if (e.kind == LlmErrorKind.badResponse) rethrow;
       _primaryRestsUntil = _now().add(_restFor(e));
-      return task(backup);
+      _primaryError = e;
+      return _onBackup(task);
+    }
+  }
+
+  /// Runs [task] on the backup. If it fails too, the error says why the
+  /// primary wasn't used as well, so a student sees the real cause.
+  Future<T> _onBackup<T>(Future<T> Function(LlmProvider llm) task) async {
+    try {
+      return await task(backup);
+    } on LlmException catch (e) {
+      final first = _primaryError;
+      if (first == null) rethrow;
+      throw LlmException(
+        e.kind,
+        '${primary.displayName}: ${first.message}. '
+        'Backup ${backup.displayName}: ${e.message}',
+        retryAfter: e.retryAfter,
+      );
     }
   }
 

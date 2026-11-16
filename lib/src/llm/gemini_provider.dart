@@ -77,8 +77,12 @@ class GeminiProvider extends HttpLlm {
         .join()
         .trim();
     if (text.isEmpty) {
-      throw const LlmException(
-          LlmErrorKind.badResponse, 'Gemini returned an empty answer');
+      final finish = (candidates.first as Map)['finishReason'];
+      throw LlmException(
+          LlmErrorKind.badResponse,
+          finish == 'MAX_TOKENS'
+              ? 'Gemini ran out of room before answering'
+              : 'Gemini returned an empty answer${finish == null ? '' : ' ($finish)'}');
     }
     return text;
   }

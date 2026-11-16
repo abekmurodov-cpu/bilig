@@ -144,8 +144,14 @@ class OpenAiCompatibleProvider extends HttpLlm {
         (choices == null || choices.isEmpty) ? null : (choices.first as Map)['message'];
     final text = (message is Map ? message['content'] as String? : null)?.trim();
     if (text == null || text.isEmpty) {
+      final finish = (choices == null || choices.isEmpty)
+          ? null
+          : (choices.first as Map)['finish_reason'];
       throw LlmException(
-          LlmErrorKind.badResponse, '$serviceName returned an empty answer');
+          LlmErrorKind.badResponse,
+          finish == 'length'
+              ? '$serviceName ran out of room before answering (the request was too long for $model)'
+              : '$serviceName returned an empty answer${finish == null ? '' : ' ($finish)'}');
     }
     return text;
   }

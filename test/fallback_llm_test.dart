@@ -67,4 +67,14 @@ void main() {
       throwsA(isA<LlmException>().having((e) => e.kind, 'kind', LlmErrorKind.auth)),
     );
   });
+
+  test('when the backup fails too, the error says why the main AI was skipped', () async {
+    main.failWith = const LlmException(LlmErrorKind.network, 'The AI took too long to answer');
+    backup.failWith = const LlmException(LlmErrorKind.badResponse, 'Groq returned an empty answer');
+    await expectLater(
+      llm.suggestCategory('x', null),
+      throwsA(isA<LlmException>().having((e) => e.message, 'message',
+          allOf(contains('took too long'), contains('empty answer')))),
+    );
+  });
 }

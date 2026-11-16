@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:knowledge/src/models/knowledge_item.dart';
+import 'package:knowledge/src/llm/llm_provider.dart' show Attachment;
 import 'package:knowledge/src/llm/prompted_llm.dart';
 import 'package:knowledge/src/models/note_search.dart';
 import 'package:knowledge/src/practice/answer_matching.dart';
@@ -277,4 +278,42 @@ void main() {
       expect(() => PromptedLlm.parseTopics(notes, 'Sorry, I cannot.'), throwsA(anything));
     });
   });
+
+  test('many notes are sorted in small requests', () async {
+    final notes = [
+      for (var i = 0; i < 120; i++)
+        note('n$i', 'Note $i', back: 'A long answer ' * 60, category: 'Bio'),
+    ];
+    final llm = _ScriptedLlm((prompt) {
+      if (prompt.contains('topic names only')) return '1. **Cells**\n2. Genetics';
+      // Every batch: odd notes Cells, even Genetics.
+      final count = RegExp(r'^\d+\. ', multiLine: true).allMatches(prompt).length;
+      return 'Cells: ${[for (var i = 1; i <= count; i += 2) i].join(', ')}\n'
+          'Genetics: ${[for (var i = 2; i <= count; i += 2) i].join(', ')}';
+    });
+    final topics = await llm.suggestTopics('Bio', notes);
+    expect(topics.length, 120);
+    expect(topics['n0'], 'Cells');
+    expect(topics['n119'], 'Genetics');
+    expect(llm.prompts.length, 1 + 3); // names, then 3 batches of 50
+    // Notes are sent as short lines, not whole answers.
+    expect(llm.prompts.map((p) => p.length).reduce((a, b) => a > b ? a : b),
+        lessThan(10000));
+  });
+}
+
+class _ScriptedLlm extends PromptedLlm {
+  _ScriptedLlm(this.reply);
+  final String Function(String prompt) reply;
+  final prompts = <String>[];
+
+  @override
+  Future<String> complete(String prompt,
+      {bool json = false, List<Attachment> attachments = const []}) async {
+    prompts.add(prompt);
+    return reply(prompt);
+  }
+
+  @override
+  String get displayName => 'scripted';
 }
