@@ -1,10 +1,12 @@
 import 'dart:convert';
+import 'dart:io' show File;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/anki_import.dart';
+import '../data/auto_backup.dart';
 import '../data/bilig_file.dart';
 import '../data/sample_notes.dart';
 import '../l10n/app_strings.dart';
@@ -75,6 +77,40 @@ class _DataSectionState extends ConsumerState<DataSection> {
         await openNotesFile(context, ref, picked.$1, picked.$2);
       });
 
+  Future<void> _openAutoBackups() => _run(() async {
+        final strings = context.s;
+        final backups = await AutoBackup.list();
+        if (!mounted) return;
+        if (backups.isEmpty) {
+          _say(strings.noAutoBackups);
+          return;
+        }
+        final local = MaterialLocalizations.of(context);
+        final picked = await showDialog<File>(
+          context: context,
+          builder: (context) => SimpleDialog(
+            title: Text(strings.autoBackups),
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 8),
+                child: Text(strings.autoBackupsBlurb,
+                    style: Theme.of(context).textTheme.bodySmall),
+              ),
+              for (final b in backups)
+                ListTile(
+                  leading: const Icon(Icons.history),
+                  title: Text(local.formatMediumDate(b.date)),
+                  onTap: () => Navigator.pop(context, b.file),
+                ),
+            ],
+          ),
+        );
+        if (picked == null) return;
+        final bytes = await AutoBackup.read(picked);
+        if (!mounted) return;
+        await openNotesFile(context, ref, picked.uri.pathSegments.last, bytes);
+      });
+
   Future<void> _removeSamples() => _run(() async {
         final strings = context.s;
         final n = await ref.read(knowledgeListProvider.notifier).deleteTagged(sampleTags);
@@ -113,6 +149,13 @@ class _DataSectionState extends ConsumerState<DataSection> {
             subtitle: Text(strings.importAnkiBlurb),
             enabled: !_busy,
             onTap: _importOther,
+          ),
+          ListTile(
+            leading: const Icon(Icons.history),
+            title: Text(strings.autoBackups),
+            subtitle: Text(strings.autoBackupsSubtitle),
+            enabled: !_busy,
+            onTap: _openAutoBackups,
           ),
           if (hasSamples)
             ListTile(

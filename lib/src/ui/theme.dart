@@ -3,6 +3,13 @@ import 'package:flutter/material.dart';
 /// Bilig's indigo.
 const Color brandSeed = Color(0xFF5B6CF0);
 
+/// The app's typeface (bundled, so the Mac and phones look alike and
+/// Uzbek ʻ and Cyrillic render the same everywhere).
+const String appFont = 'Inter';
+
+/// The serif of the note paper.
+const String paperFont = 'SourceSerif';
+
 /// Corner radius of cards, sheets and grouped sections.
 const double cardRadius = 18;
 
@@ -14,7 +21,7 @@ const double controlRadius = 14;
 ThemeData buildTheme(Brightness brightness) {
   final scheme = ColorScheme.fromSeed(seedColor: brandSeed, brightness: brightness);
   final dark = brightness == Brightness.dark;
-  final base = ThemeData(colorScheme: scheme, useMaterial3: true);
+  final base = ThemeData(colorScheme: scheme, useMaterial3: true, fontFamily: appFont);
   final text = base.textTheme;
   final controlShape =
       RoundedRectangleBorder(borderRadius: BorderRadius.circular(controlRadius));
@@ -35,6 +42,7 @@ ThemeData buildTheme(Brightness brightness) {
       // The theme's text styles get their sizes later (per locale), so
       // styles set outside textTheme spell out their size.
       titleTextStyle: TextStyle(
+          fontFamily: appFont,
           fontSize: 24,
           fontWeight: FontWeight.w700,
           color: scheme.onSurface,
@@ -72,7 +80,7 @@ ThemeData buildTheme(Brightness brightness) {
       style: FilledButton.styleFrom(
         minimumSize: buttonSize,
         shape: controlShape,
-        textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+        textStyle: const TextStyle(fontFamily: appFont, fontSize: 15, fontWeight: FontWeight.w600),
       ),
     ),
     outlinedButtonTheme: OutlinedButtonThemeData(
@@ -109,6 +117,7 @@ ThemeData buildTheme(Brightness brightness) {
       backgroundColor: dark ? scheme.surfaceContainer : scheme.surfaceContainerLow,
       indicatorColor: scheme.primaryContainer,
       labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
+          fontFamily: appFont,
           fontSize: 12,
           fontWeight: states.contains(WidgetState.selected) ? FontWeight.w700 : FontWeight.w500)),
     ),

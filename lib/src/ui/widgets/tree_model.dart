@@ -74,7 +74,20 @@ class TreeModel {
     return 100 * (1 << (stage - fixed.length + 1));
   }
 
+  /// Trees already grown, by seed and note count: building one walks a
+  /// recursive skeleton, and the same tree is drawn on Home, in Notes and in
+  /// the category sheet.
+  static final Map<(String, int), TreeModel> _grown = {};
+
   factory TreeModel.generate({required int count, required String seed}) {
+    final key = (seed, count);
+    final cached = _grown[key];
+    if (cached != null) return cached;
+    if (_grown.length > 200) _grown.clear();
+    return _grown[key] = TreeModel._grow(count: count, seed: seed);
+  }
+
+  factory TreeModel._grow({required int count, required String seed}) {
     final stage = stageFor(math.max(count, 1));
     final capacity = capacityOf(stage);
     // Deepen until there are enough twigs to hold the stage's capacity.

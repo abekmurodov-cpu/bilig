@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../l10n/app_strings.dart';
+import 'ai_log_screen.dart';
 import 'data_section.dart';
 import '../llm/ai_services.dart';
 import '../llm/llm_provider.dart';
@@ -211,7 +212,21 @@ class _LlmSection extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: config == null
             ? const _AiConnectForm()
-            : _AiConnected(config: config),
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  _AiConnected(config: config),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.receipt_long_outlined),
+                    title: Text(context.s.aiActivity),
+                    subtitle: Text(context.s.aiActivitySubtitle),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => const AiLogScreen())),
+                  ),
+                ],
+              ),
       ),
     );
   }

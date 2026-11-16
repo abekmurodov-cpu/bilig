@@ -28,14 +28,17 @@ List<KnowledgeItem> searchNotes(List<KnowledgeItem> notes, String query,
       hits.add((note, 0));
       continue;
     }
-    final front = _fold(note.front);
-    final all = _fold([
-      note.front,
-      note.back ?? '',
-      note.category ?? '',
-      ...note.tags,
-      for (final q in note.quizVariants) '${q.question ?? ''} ${q.answer}',
-    ].join(' \n '));
+    final (front, all) = _folded[note] ??= (
+      _fold(note.front),
+      _fold([
+        note.front,
+        note.back ?? '',
+        note.category ?? '',
+        note.topic ?? '',
+        ...note.tags,
+        for (final q in note.quizVariants) '${q.question ?? ''} ${q.answer}',
+      ].join(' \n ')),
+    );
     if (!words.every(all.contains)) continue;
     hits.add((note, words.where(front.contains).length));
   }
@@ -44,6 +47,11 @@ List<KnowledgeItem> searchNotes(List<KnowledgeItem> notes, String query,
     ..sort((a, b) => b.$1.$2 != a.$1.$2 ? b.$1.$2 - a.$1.$2 : a.$2 - b.$2);
   return [for (final h in indexed) h.$1.$1];
 }
+
+/// Each note's searchable text, folded once per version of the note (notes
+/// are immutable, so an edit is a new object): typing a query then only
+/// compares strings.
+final Expando<(String, String)> _folded = Expando('folded');
 
 /// A topic as a search filter entry, alongside category names.
 String topicKey(String category, String topic) => '$category\u001f$topic';

@@ -13,6 +13,7 @@ import 'image_picking.dart';
 import 'item_tile.dart';
 import 'markable_text.dart';
 import 'note_image.dart';
+import 'undo_delete.dart';
 
 /// Bottom sheet showing a note's details with quick edit + delete, the
 /// marker for key ideas, and the note's practice questions. Opened from the
@@ -193,8 +194,12 @@ class _NoteDetailSheetState extends ConsumerState<_NoteDetailSheet> {
   }
 
   Future<void> _delete() async {
-    await ref.read(knowledgeListProvider.notifier).delete(widget.item.id);
+    final strings = context.s;
+    final messenger = ScaffoldMessenger.of(context);
+    final store = ref.read(knowledgeListProvider.notifier);
+    final deleted = await store.deleteMany({widget.item.id});
     if (mounted) Navigator.of(context).pop();
+    showUndoDelete(messenger, strings, store, deleted);
   }
 
   Future<void> _pickImage() async {

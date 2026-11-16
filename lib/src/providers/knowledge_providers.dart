@@ -81,7 +81,7 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
       highlights: keptHighlights(highlights, front.trim(), back?.trim()),
       tags: tags,
     );
-    await _repo.save(item);
+    await _save(item);
     await _refresh();
   }
 
@@ -97,7 +97,7 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
       final back = d.back?.trim();
       final code = d.type == KnowledgeType.code ? back ?? '' : '';
       final drills = code.isNotEmpty ? generateCodeDrills(code) : null;
-      await _repo.save(KnowledgeItem(
+      await _save(KnowledgeItem(
         id: _uuid.v4(),
         front: d.front.trim(),
         back: back == null || back.isEmpty ? null : back,
@@ -153,7 +153,7 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
       final image = file.images[note.id];
       if (image != null) await _images.putBase64(save.id, image);
       // Files carry every image their notes have.
-      await _repo.save(save.copyWith(hasImage: image != null));
+      await _save(save.copyWith(hasImage: image != null));
     }
     await _refresh();
     return (added: added, updated: updated);
@@ -166,7 +166,7 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
         if (i.tags.any((t) => tags.contains(t.toLowerCase()))) i.id,
     ];
     for (final id in doomed) {
-      await _repo.delete(id);
+      await _delete(id);
       await _images.delete(id);
     }
     await _refresh();
@@ -176,7 +176,7 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
   /// Persists an already-built item (bumping [updatedAt] for sync). Used by the
   /// practice flow to cache a generated answer / multiple-choice quiz.
   Future<void> persist(KnowledgeItem item) async {
-    await _repo.save(item.copyWith(updatedAt: DateTime.now()));
+    await _save(item.copyWith(updatedAt: DateTime.now()));
     await _refresh();
   }
 
@@ -184,7 +184,7 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
   Future<void> persistAll(Iterable<KnowledgeItem> items) async {
     final now = DateTime.now();
     for (final item in items) {
-      await _repo.save(item.copyWith(updatedAt: now));
+      await _save(item.copyWith(updatedAt: now));
     }
     await _refresh();
   }
@@ -192,14 +192,14 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
   /// Attaches (or replaces) an image on an existing note.
   Future<void> setImage(KnowledgeItem item, Uint8List bytes) async {
     await _images.putBytes(item.id, bytes);
-    await _repo.save(item.copyWith(hasImage: true, updatedAt: DateTime.now()));
+    await _save(item.copyWith(hasImage: true, updatedAt: DateTime.now()));
     await _refresh();
   }
 
   /// Removes a note's image.
   Future<void> removeImage(KnowledgeItem item) async {
     await _images.delete(item.id);
-    await _repo.save(item.copyWith(hasImage: false, updatedAt: DateTime.now()));
+    await _save(item.copyWith(hasImage: false, updatedAt: DateTime.now()));
     await _refresh();
   }
 
@@ -209,7 +209,7 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
     final exam = ref.read(examsProvider.notifier).upcoming(item.category);
     final updated =
         ref.read(_schedulerProvider).schedule(item, grade, examDate: exam);
-    await _repo.save(updated);
+    await _save(updated);
     await ref
         .read(activityProvider.notifier)
         .record(correct: grade != ReviewGrade.again);
@@ -226,7 +226,7 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
         if (i.id == before.id) i,
     ].firstOrNull ?? before;
     final old = before.toMap();
-    await _repo.save(KnowledgeItem.fromMap({
+    await _save(KnowledgeItem.fromMap({
       ...current.toMap(),
       for (final k in KnowledgeItem.reviewFields) k: old[k],
       'updatedAt': DateTime.now().toIso8601String(),
@@ -268,7 +268,7 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
           updatedAt: DateTime.now(),
         )
         .withPlace(_existingCategory(category), _existingTopic(category, topic));
-    await _repo.save(updated);
+    await _save(updated);
     await _refresh();
   }
 
@@ -279,13 +279,39 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
       highlights: highlights,
       updatedAt: DateTime.now(),
     );
-    await _repo.save(updated);
+    await _save(updated);
     await _refresh();
   }
 
   Future<void> delete(String id) async {
-    await _repo.delete(id);
-    await _images.delete(id);
+    await deleteMany({id});
+  }
+
+  /// Deletes the notes with [ids] at once, keeping what [restore] needs to
+  /// bring them back (the Undo after a delete).
+  Future<DeletedNotes> deleteMany(Set<String> ids) async {
+    final notes = <KnowledgeItem>[];
+    final images = <String, String>{};
+    for (final item in state.asData?.value ?? const <KnowledgeItem>[]) {
+      if (!ids.contains(item.id)) continue;
+      notes.add(item);
+      final image = item.hasImage ? _images.getBase64(item.id) : null;
+      if (image != null) images[item.id] = image;
+      await _delete(item.id);
+      await _images.delete(item.id);
+    }
+    await _refresh();
+    return DeletedNotes(notes, images);
+  }
+
+  /// Brings deleted notes back as they were.
+  Future<void> restore(DeletedNotes deleted) async {
+    final now = DateTime.now();
+    for (final item in deleted.notes) {
+      final image = deleted.images[item.id];
+      if (image != null) await _images.putBase64(item.id, image);
+      await _save(item.copyWith(updatedAt: now));
+    }
     await _refresh();
   }
 
@@ -325,7 +351,7 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
     final now = DateTime.now();
     for (final item in state.asData?.value ?? const <KnowledgeItem>[]) {
       if (!ids.contains(item.id)) continue;
-      await _repo.save(item.withPlace(place, inTopic).copyWith(updatedAt: now));
+      await _save(item.withPlace(place, inTopic).copyWith(updatedAt: now));
     }
     await _refresh();
   }
@@ -338,7 +364,7 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
       if (item.category != category || !topicById.containsKey(item.id)) continue;
       final topic = topicById[item.id]?.trim();
       if (topic == item.topic) continue;
-      await _repo.save(item
+      await _save(item
           .withPlace(category, topic == null || topic.isEmpty ? null : topic)
           .copyWith(updatedAt: now));
     }
@@ -356,9 +382,9 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
     for (final item in state.asData?.value ?? const <KnowledgeItem>[]) {
       if (item.category != category) continue;
       if (topic == null) {
-        await _repo.save(item.withPlace(target, item.topic).copyWith(updatedAt: now));
+        await _save(item.withPlace(target, item.topic).copyWith(updatedAt: now));
       } else if (item.topic == topic) {
-        await _repo.save(item.withPlace(category, newTopic).copyWith(updatedAt: now));
+        await _save(item.withPlace(category, newTopic).copyWith(updatedAt: now));
       }
     }
     if (topic == null && target != category) {
@@ -372,9 +398,55 @@ class KnowledgeListNotifier extends AsyncNotifier<List<KnowledgeItem>> {
     await _refresh();
   }
 
-  Future<void> _refresh() async {
-    state = AsyncData(await _repo.getAll());
+  /// Changes saved since the list on screen was last updated.
+  final Map<String, KnowledgeItem> _changed = {};
+  final Set<String> _deleted = {};
+
+  Future<void> _save(KnowledgeItem item) async {
+    await _repo.save(item);
+    _deleted.remove(item.id);
+    _changed[item.id] = item;
   }
+
+  Future<void> _delete(String id) async {
+    await _repo.delete(id);
+    _changed.remove(id);
+    _deleted.add(id);
+  }
+
+  /// Shows what was saved: patched into the list in memory, rather than
+  /// reading every note back from storage after each change (a grade, an
+  /// edit), which got slow with thousands of notes.
+  Future<void> _refresh() async {
+    final current = state.asData?.value;
+    if (current == null) {
+      state = AsyncData(await _repo.getAll());
+    } else {
+      final known = <String>{};
+      final next = <KnowledgeItem>[
+        for (final item in current)
+          if (!_deleted.contains(item.id)) ...[
+            if (known.add(item.id)) _changed[item.id] ?? item,
+          ],
+      ];
+      for (final item in _changed.values) {
+        if (known.add(item.id)) next.add(item);
+      }
+      state = AsyncData(next);
+    }
+    _changed.clear();
+    _deleted.clear();
+  }
+}
+
+/// Notes just deleted, kept for Undo.
+class DeletedNotes {
+  const DeletedNotes(this.notes, this.images);
+
+  final List<KnowledgeItem> notes;
+
+  /// Note id → its image, base64.
+  final Map<String, String> images;
 }
 
 final knowledgeListProvider =

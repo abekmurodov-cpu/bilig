@@ -4,10 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../capture/share_inbox.dart';
+import '../data/auto_backup.dart';
 import '../l10n/app_strings.dart';
 import '../llm/quiz_prep.dart';
 import '../platform/due_signals.dart';
 import '../providers/navigation.dart';
+import '../providers/settings_providers.dart';
 import '../providers/knowledge_providers.dart';
 import '../sync/sync_providers.dart';
 import 'bulk_add_screen.dart';
@@ -36,6 +38,7 @@ class _AppShellState extends ConsumerState<AppShell> {
     // Best-effort silent pull on startup when a sync backend is attached.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       _autoSync();
+      _autoBackup();
       _scheduleSignals();
       ShareInbox.listen(_openShared);
       final initial = await ShareInbox.takeInitial();
@@ -59,6 +62,17 @@ class _AppShellState extends ConsumerState<AppShell> {
           builder: (_) => CaptureScreen(initialFront: text)));
     } else {
       openBulkAdd(context, BulkSource.text, text: text);
+    }
+  }
+
+  /// The weekly safety copy, once the notes have loaded.
+  Future<void> _autoBackup() async {
+    try {
+      final notes = await ref.read(knowledgeListProvider.future);
+      await AutoBackup.runIfDue(
+          notes, ref.read(imageStoreProvider), ref.read(settingsRepositoryProvider));
+    } catch (_) {
+      // Best effort: a failed copy is tried again next start.
     }
   }
 
@@ -108,7 +122,14 @@ class _AppShellState extends ConsumerState<AppShell> {
     // The bar has Capture in the middle: it opens a screen, not a tab.
     const capture = 2;
     return Scaffold(
-      body: IndexedStack(index: tab, children: _tabs),
+      body: IndexedStack(
+        index: tab,
+        children: [
+          // Hidden tabs stay alive but stop animating (the swaying trees).
+          for (var i = 0; i < _tabs.length; i++)
+            TickerMode(enabled: i == tab, child: _tabs[i]),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: tab < capture ? tab : tab + 1,
         onDestinationSelected: (i) {

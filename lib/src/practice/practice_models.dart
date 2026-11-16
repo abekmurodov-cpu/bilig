@@ -99,7 +99,7 @@ class PracticeConfig {
     if (method == PracticeMethod.fillBlank) {
       pool = pool.where((i) => i.type == KnowledgeType.code
           ? _canFillBlank(i)
-          : textBlanks(i) != null);
+          : _canTextBlank(i));
     } else if (method.isCoding) {
       // Coding drills quiz code notes whose snippet (in the answer/back field)
       // can actually produce the drill.
@@ -120,8 +120,16 @@ class PracticeConfig {
   }
 
   static bool _canFillBlank(KnowledgeItem i) =>
-      generateCodeDrills(i.back ?? '').fillBlankAnswers.isNotEmpty;
+      _drillable[i] ??= generateCodeDrills(i.back ?? '').fillBlankAnswers.isNotEmpty;
 
   static bool _canReorder(KnowledgeItem i) =>
-      generateCodeDrills(i.back ?? '').reorderSegments.length > 1;
+      _reorderable[i] ??= generateCodeDrills(i.back ?? '').reorderSegments.length > 1;
+
+  static bool _canTextBlank(KnowledgeItem i) => _blankable[i] ??= textBlanks(i) != null;
+
+  // Whether a note can make each drill, worked out once per version of the
+  // note: the Practice screen counts every scope on each redraw.
+  static final _drillable = Expando<bool>('fillBlank');
+  static final _reorderable = Expando<bool>('reorder');
+  static final _blankable = Expando<bool>('textBlank');
 }

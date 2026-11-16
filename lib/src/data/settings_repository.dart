@@ -43,6 +43,8 @@ class SettingsRepository {
   static const String kOnboarded = 'onboarded';
   static const String kActivity = 'activity';
   static const String kDailyGoal = 'dailyGoal';
+  static const String kLastAutoBackup = 'lastAutoBackup';
+  static const String kAiLog = 'aiLog';
   static const String kVoiceLocale = 'voiceLocale';
 
   final Box? _box;

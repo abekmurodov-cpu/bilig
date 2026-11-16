@@ -7,6 +7,7 @@ import 'package:http/http.dart' as http;
 import '../data/secret_store.dart';
 import '../data/settings_repository.dart';
 import '../providers/settings_providers.dart';
+import 'ai_log.dart';
 import 'ai_services.dart';
 import 'anthropic_provider.dart';
 import 'fallback_llm.dart';
@@ -213,6 +214,10 @@ final llmProvider = Provider<LlmProvider?>((ref) {
   final config = ref.watch(aiConfigProvider);
   if (config == null) return null;
   final backup = ref.watch(backupAiProvider);
-  final primary = createLlm(config);
-  return backup == null ? primary : FallbackLlm(primary, createLlm(backup));
+  // Each AI logs its own requests, so the log shows which one answered.
+  final log = ref.read(aiLogProvider.notifier);
+  final primary = LoggedLlm(createLlm(config), log.add);
+  return backup == null
+      ? primary
+      : FallbackLlm(primary, LoggedLlm(createLlm(backup), log.add));
 });

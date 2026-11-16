@@ -213,6 +213,41 @@ class AppStrings {
   String get strugglingWith => _t('Struggling with', 'Qiyin bo‘layotganlar', 'Даются с трудом');
   String get seeAll => _t('See all', 'Hammasi', 'Все');
   String get practiseThese => _t('Practise these', 'Shularni mashq qilish', 'Повторить их');
+  String get undo => _t('Undo', 'Bekor qilish', 'Отменить');
+  String notesDeleted(int n) => _t(n == 1 ? 'Note deleted' : '$n notes deleted',
+      n == 1 ? 'Qayd o‘chirildi' : '$n ta qayd o‘chirildi', 'Удалено заметок: $n');
+  String get autoBackups =>
+      _t('Automatic backups', 'Avtomatik zaxiralar', 'Автоматические копии');
+  String get autoBackupsSubtitle => _t('A copy every week, the last 4 kept. Tap to restore.',
+      'Har hafta nusxa, oxirgi 4 tasi saqlanadi. Tiklash uchun bosing.',
+      'Копия раз в неделю, хранятся 4 последние. Нажмите, чтобы восстановить.');
+  String get autoBackupsBlurb => _t(
+      'Restoring keeps your newer changes: a note is only replaced by an older copy if it was deleted.',
+      'Tiklashda yangi o‘zgarishlaringiz saqlanadi: faqat o‘chirilgan qaydlar qaytariladi.',
+      'При восстановлении новые изменения сохраняются: возвращаются только удалённые заметки.');
+  String get noAutoBackups => _t('No automatic backup yet — the first is made on the next start.',
+      'Hali avtomatik zaxira yo‘q — birinchisi keyingi ishga tushirishda yaratiladi.',
+      'Автоматических копий пока нет — первая появится при следующем запуске.');
+  String get aiActivity => _t('AI activity', 'AI faoliyati', 'Журнал ИИ');
+  String get aiActivitySubtitle => _t('Recent requests: which AI answered and why one failed',
+      'So‘nggi so‘rovlar: qaysi AI javob berdi va nima uchun xato bo‘ldi',
+      'Последние запросы: какой ИИ ответил и почему была ошибка');
+  String get aiActivityEmpty => _t('No AI requests yet.', 'Hali AI so‘rovlari yo‘q.',
+      'Запросов к ИИ пока не было.');
+  String aiTask(String task) => switch (task) {
+        'expandNote' => _t('Write an answer', 'Javob yozish', 'Написать ответ'),
+        'generateQuiz' || 'generateQuizzes' =>
+          _t('Write questions', 'Savollar tuzish', 'Составить вопросы'),
+        'gradeAnswer' => _t('Check an answer', 'Javobni tekshirish', 'Проверить ответ'),
+        'gradeCode' => _t('Check code', 'Kodni tekshirish', 'Проверить код'),
+        'suggestCategory' => _t('Suggest a category', 'Turkum taklifi', 'Предложить категорию'),
+        'explainMistake' => _t('Why was I wrong?', 'Nega xato?', 'Почему неверно?'),
+        'notesFromImage' => _t('Photo to notes', 'Rasmdan qaydlar', 'Заметки с фото'),
+        'notesFromText' => _t('Split text into notes', 'Matnni qaydlarga bo‘lish', 'Разбить текст'),
+        'transcribe' => _t('Voice to text', 'Ovozdan matnga', 'Голос в текст'),
+        'suggestHighlights' => _t('Suggest key ideas', 'Asosiy g‘oyalar taklifi', 'Ключевые идеи'),
+        _ => task,
+      };
   String get allTopics => _t('All topics', 'Barcha mavzular', 'Все темы');
   String get topicOptional =>
       _t('Topic (optional)', 'Mavzu (ixtiyoriy)', 'Тема (необязательно)');

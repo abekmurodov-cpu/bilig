@@ -10,6 +10,7 @@ import 'widgets/category_field.dart';
 import 'widgets/category_tree.dart';
 import 'widgets/item_tile.dart';
 import 'widgets/note_detail_sheet.dart';
+import 'widgets/undo_delete.dart';
 
 enum _NotesView { list, tree }
 
@@ -96,12 +97,12 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
         ],
       ),
     );
-    if (ok != true) return;
+    if (ok != true || !mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
     final store = ref.read(knowledgeListProvider.notifier);
-    for (final id in {..._selected}) {
-      await store.delete(id);
-    }
+    final deleted = await store.deleteMany({..._selected});
     if (mounted) setState(_selected.clear);
+    showUndoDelete(messenger, strings, store, deleted);
   }
 
   bool get _filtering =>
