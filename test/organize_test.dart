@@ -271,6 +271,10 @@ void main() {
       final topics = PromptedLlm.parseTopics(notes,
           '{"topics": [{"name": "Cells", "notes": [1, 3, 9]}, {"name": "Genetics", "notes": ["2"]}]}');
       expect(topics, {'a': 'Cells', 'c': 'Cells', 'b': 'Genetics'});
+      final lines = PromptedLlm.parseTopics(notes,
+          'Here are the topics:\n1. **Cells**: 1, 3\n- Genetics: 2, 7\nHope this helps!');
+      expect(lines, {'a': 'Cells', 'c': 'Cells', 'b': 'Genetics'});
+      expect(() => PromptedLlm.parseTopics(notes, 'Sorry, I cannot.'), throwsA(anything));
     });
   });
 }

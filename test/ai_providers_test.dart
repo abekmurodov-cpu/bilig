@@ -149,6 +149,32 @@ void main() {
           [true, false, false]);
     });
 
+    test("retries without JSON mode when Groq's JSON check fails", () async {
+      final bodies = <Map>[];
+      final llm = make(MockClient((req) async {
+        final body = jsonDecode(req.body) as Map;
+        bodies.add(body);
+        if (body.containsKey('response_format')) {
+          return jsonResponse({
+            'error': {
+              'message': 'Failed to validate JSON.',
+              'code': 'json_validate_failed',
+              'failed_generation': '{"correct": false,}',
+            },
+          }, 400);
+        }
+        return jsonResponse({
+          'choices': [
+            {'message': {'content': '{"correct": true}'}},
+          ],
+        }, 200);
+      }));
+      expect((await llm.gradeAnswer(_note('q', 'a'), 'b')).correct, isTrue);
+      // JSON mode stays on for later requests: one slip isn't the model's limit.
+      await llm.gradeAnswer(_note('q', 'a'), 'b');
+      expect(bodies.map((b) => b.containsKey('response_format')), [true, false, true, false]);
+    });
+
     test('maps errors', () async {
       Future<void> expectKind(http.Response resp, LlmErrorKind kind) =>
           expectLater(make(MockClient((_) async => resp)).suggestCategory('x', null),

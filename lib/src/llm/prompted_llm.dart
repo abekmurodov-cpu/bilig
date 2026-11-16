@@ -385,35 +385,48 @@ abstract class PromptedLlm implements LlmProvider {
       final back = n.back == null ? '' : ' — ${_clip(n.back!.replaceAll('\n', ' '))}';
       list.writeln('${i + 1}. ${_clip(n.front.replaceAll('\n', ' '))}$back');
     }
+    // Plain lines rather than JSON: with many notes, some models (and
+    // Groq's strict JSON check) trip over long JSON lists.
     final raw = await complete(
-      'A student\'s course "$category" has the notes below. Group them into '
-      '3-8 topics (sections of the course a student would study separately). '
+      'A student\'s course "$category" has the numbered notes below. Group them '
+      'into 3-8 topics (sections of the course a student would study separately). '
       'Topic names: 1-3 words, Title Case, in the language of the notes.'
       '${existing.isEmpty ? '' : ' Reuse these existing topic names where they fit: ${existing.join(', ')}.'}'
       ' Every note gets exactly one topic.\n'
-      'Return JSON: {"topics": [{"name": "...", "notes": [1, 4, 7]}]}.\n\n'
+      'Reply with one line per topic and nothing else, in this form:\n'
+      'Topic name: 1, 4, 7\n\n'
       'Notes:\n$list',
-      json: true,
     );
     return parseTopics(batch, raw);
   }
 
-  /// Note id → topic from the AI's reply (note numbers are 1-based); notes
-  /// it left out or numbers it made up are skipped.
+  /// Note id → topic from the AI's reply: "Topic: 1, 4, 7" lines (or the
+  /// same as JSON). Note numbers are 1-based; notes it left out or numbers
+  /// it made up are skipped.
   static Map<String, String> parseTopics(List<KnowledgeItem> notes, String raw) {
+    final groups = <(String, List<Object?>)>[];
     final decoded = decodeJsonLoose(raw);
     final topics = decoded is Map ? decoded['topics'] : decoded;
-    if (topics is! List) {
-      throw const LlmException(LlmErrorKind.badResponse, 'The AI returned no topics');
+    if (topics is List) {
+      for (final t in topics) {
+        if (t is Map && t['notes'] is List) {
+          groups.add(('${t['name'] ?? ''}', t['notes'] as List));
+        }
+      }
+    } else {
+      final line = RegExp(r'^[\s\-*#\d.)]*\**(.+?)\**\s*[:：\-–—]\s*([\d,\s]+)\.?\s*$');
+      for (final l in raw.split('\n')) {
+        final m = line.firstMatch(l.trim());
+        if (m == null) continue;
+        groups.add((m.group(1)!, m.group(2)!.split(RegExp(r'[,\s]+'))));
+      }
     }
     final out = <String, String>{};
-    for (final t in topics) {
-      if (t is! Map) continue;
-      final name = '${t['name'] ?? ''}'.trim();
-      final members = t['notes'];
-      if (name.isEmpty || members is! List) continue;
+    for (final (rawName, members) in groups) {
+      final name = rawName.trim().replaceAll(RegExp(r'^["“]|["”]$'), '');
+      if (name.isEmpty) continue;
       for (final m in members) {
-        final i = (m is num ? m.toInt() : int.tryParse('$m') ?? 0) - 1;
+        final i = (m is num ? m.toInt() : int.tryParse('$m'.trim()) ?? 0) - 1;
         if (i >= 0 && i < notes.length) out.putIfAbsent(notes[i].id, () => name);
       }
     }

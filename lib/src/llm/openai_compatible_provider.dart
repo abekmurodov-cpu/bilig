@@ -121,6 +121,15 @@ class OpenAiCompatibleProvider extends HttpLlm {
       _jsonMode = false;
       return send(prompt, json: json, attachments: attachments);
     }
+    // Groq checks JSON-mode replies itself and fails the whole request when
+    // the model slips (a stray comma, a cut-off list). Ask once more without
+    // JSON mode: the reply is then read leniently by the caller.
+    if (resp.statusCode == 400 &&
+        useJsonMode &&
+        (resp.body.contains('json_validate_failed') ||
+            resp.body.contains('failed_generation'))) {
+      return send(prompt, json: false, attachments: attachments);
+    }
     if (resp.statusCode != 200) throw errorFor(resp);
 
     final Object? data;
