@@ -68,6 +68,7 @@ class PracticeConfig {
     required this.scope,
     this.category,
     this.topic,
+    this.reverse = false,
   });
 
   final PracticeMethod method;
@@ -76,6 +77,14 @@ class PracticeConfig {
 
   /// With [category]: only this topic of it.
   final String? topic;
+
+  /// Asks the other way round: shows the answer, recall the prompt (terms,
+  /// vocabulary). Flashcards and typed answers only; notes need an answer.
+  final bool reverse;
+
+  /// Whether [method] can be asked the other way round.
+  static bool canReverse(PracticeMethod method) =>
+      method == PracticeMethod.flashcard || method == PracticeMethod.typeAnswer;
 
   /// Builds the queue from [all] (every note) and [due] (currently-due notes),
   /// filtered by scope. Multiple-choice and type-the-answer need something to
@@ -96,7 +105,9 @@ class PracticeConfig {
           (topic == null || i.topic == topic)),
     };
 
-    if (method == PracticeMethod.fillBlank) {
+    if (reverse && canReverse(method)) {
+      pool = pool.where((i) => i.hasAnswer);
+    } else if (method == PracticeMethod.fillBlank) {
       pool = pool.where((i) => i.type == KnowledgeType.code
           ? _canFillBlank(i)
           : _canTextBlank(i));

@@ -25,6 +25,7 @@ import '../widgets/code_highlighter.dart';
 import '../widgets/flip_card.dart';
 import '../theme.dart';
 import '../widgets/item_tile.dart';
+import '../widgets/note_detail_sheet.dart';
 import '../widgets/note_image.dart';
 import '../widgets/note_text.dart';
 import 'practice_screen.dart' show methodIcon;
@@ -108,7 +109,11 @@ class _PracticeSessionScreenState
   /// How long practice waits for AI questions before starting anyway.
   static const _warmUpLimit = Duration(seconds: 25);
 
-  bool get _usesQuiz => switch (widget.config.method) {
+  /// Asking the other way round: the answer is shown, the prompt recalled.
+  bool get _reverse =>
+      widget.config.reverse && PracticeConfig.canReverse(widget.config.method);
+
+  bool get _usesQuiz => !_reverse && switch (widget.config.method) {
         PracticeMethod.multipleChoice ||
         PracticeMethod.flashcard ||
         PracticeMethod.typeAnswer =>
@@ -188,6 +193,7 @@ class _PracticeSessionScreenState
 
   /// What the card shows as the prompt.
   String get _prompt {
+    if (_reverse) return _item.back ?? _item.front;
     final q = _quiz?.question;
     return (q != null && q.trim().isNotEmpty) ? q : _item.front;
   }
@@ -360,6 +366,7 @@ class _PracticeSessionScreenState
   /// reworded AI question, the matching answer is that question's concise
   /// answer; otherwise prefer the note's own detailed [back].
   String? get _revealAnswer {
+    if (_reverse) return _item.front;
     final quiz = _quiz;
     final reworded = quiz?.question?.trim().isNotEmpty ?? false;
     return reworded ? quiz!.answer : (_item.back ?? quiz?.answer);
@@ -413,6 +420,22 @@ class _PracticeSessionScreenState
     _celebrateGoal();
     if (counted) _correctCount++;
     _advance();
+  }
+
+  /// Opens the note on screen to fix it (a typo, a better answer) without
+  /// leaving practice; the card then shows the edited note.
+  Future<void> _editCurrent() async {
+    final id = _item.id;
+    await showNoteDetailSheet(context, _item);
+    if (!mounted || _index >= _queue.length || _item.id != id) return;
+    final items = ref.read(knowledgeListProvider).asData?.value ?? const [];
+    final fresh = items.where((n) => n.id == id).firstOrNull;
+    if (fresh == null) {
+      // Deleted from the sheet: move on.
+      _advance();
+      return;
+    }
+    setState(() => _queue[_index] = fresh);
   }
 
   /// Confetti the moment today's reviews reach the daily goal.
@@ -554,6 +577,12 @@ class _PracticeSessionScreenState
                 ),
               ),
         actions: [
+          if (!done && !_warmingUp)
+            IconButton(
+              tooltip: context.s.editNote,
+              icon: const Icon(Icons.edit_outlined),
+              onPressed: _editCurrent,
+            ),
           if (_history.isNotEmpty)
             IconButton(
               tooltip: context.s.undoGrade,
@@ -891,7 +920,9 @@ class _PracticeSessionScreenState
                           }
                         },
                         front: _cardFace(
-                          context.s.noteType(_item.type).toUpperCase(),
+                          _reverse
+                              ? context.s.whatIsThis.toUpperCase()
+                              : context.s.noteType(_item.type).toUpperCase(),
                           _prompt,
                           withImage: _item.hasImage,
                         ),
@@ -1085,8 +1116,10 @@ class _PracticeSessionScreenState
     }
     // A blank's answer is the exact highlighted words, checked on the device
     // (the AI's grading prompt is about the note's own question).
-    final llm = _isCloze ? null : _gradingLlm;
-    final aiAttached = !_isCloze && ref.read(llmProvider) != null;
+    // The AI grades against the note's own question, so a blank or a
+    // reversed card is checked on the device.
+    final llm = _isCloze || _reverse ? null : _gradingLlm;
+    final aiAttached = !_isCloze && !_reverse && ref.read(llmProvider) != null;
     setState(() => _grading = true);
     bool correct;
     var partial = false;

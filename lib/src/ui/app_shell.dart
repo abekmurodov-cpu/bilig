@@ -12,6 +12,7 @@ import '../capture/share_inbox.dart';
 import '../data/auto_backup.dart';
 import '../l10n/app_strings.dart';
 import '../llm/quiz_prep.dart';
+import '../notifications/notification_providers.dart';
 import '../platform/due_signals.dart';
 import '../providers/navigation.dart';
 import '../providers/settings_providers.dart';
@@ -115,6 +116,8 @@ class _AppShellState extends ConsumerState<AppShell> {
     _signalTimer = Timer(const Duration(seconds: 2), () {
       if (!mounted) return;
       DueSignals.update(ref.read(notesSortedProvider), context.s);
+      // Reminder texts follow the due counts.
+      ref.read(reminderProvider.notifier).refresh();
     });
   }
 

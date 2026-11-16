@@ -89,6 +89,31 @@ class NotificationService {
   Future<void> cancelDailyReminder() async {
     if (kIsWeb || !_ready) return;
     await _plugin.cancel(_dailyReminderId);
+    for (var i = 0; i < reminderDays; i++) {
+      await _plugin.cancel(_dailyReminderId + 1 + i);
+    }
+  }
+
+  /// Days of reminders scheduled ahead (rescheduled whenever notes change).
+  static const int reminderDays = 7;
+
+  /// Schedules one reminder per entry of [plan] (when → text), at most
+  /// [reminderDays] of them; the rest of the week stays quiet.
+  Future<void> scheduleReminders(Map<DateTime, String> plan) async {
+    if (kIsWeb || !_ready) return;
+    await cancelDailyReminder();
+    var i = 0;
+    for (final e in plan.entries.take(reminderDays)) {
+      final id = _dailyReminderId + 1 + i++;
+      final at = tz.TZDateTime.from(e.key, tz.local);
+      Future<void> schedule(AndroidScheduleMode mode) => _plugin.zonedSchedule(
+            id, 'Bilig', e.value, at, _details, androidScheduleMode: mode);
+      try {
+        await schedule(AndroidScheduleMode.exactAllowWhileIdle);
+      } catch (_) {
+        await schedule(AndroidScheduleMode.inexactAllowWhileIdle);
+      }
+    }
   }
 
   tz.TZDateTime _nextInstanceOf(int hour, int minute) {

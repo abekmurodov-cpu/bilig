@@ -21,6 +21,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
   PracticeScope _scope = PracticeScope.all;
   String? _category;
   String? _topic;
+  bool _reverse = false;
 
   void _start() {
     final config = PracticeConfig(
@@ -28,6 +29,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
       scope: _scope,
       category: _category,
       topic: _topic,
+      reverse: _reverse && PracticeConfig.canReverse(_method),
     );
     final all = ref.read(notesSortedProvider);
     final due = ref.read(dueItemsProvider);
@@ -53,6 +55,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
         scope: scope,
         category: category,
         topic: topic,
+        reverse: _reverse && PracticeConfig.canReverse(_method),
       )
           .buildQueue(
             all: ref.watch(notesSortedProvider),
@@ -108,6 +111,19 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
         children: [
           heading(strings.method),
           grid(PracticeMethod.values.where((m) => !m.isCoding)),
+          if (PracticeConfig.canReverse(_method))
+            Padding(
+              padding: const EdgeInsets.only(top: 10),
+              child: Card(
+                child: SwitchListTile(
+                  value: _reverse,
+                  onChanged: (v) => setState(() => _reverse = v),
+                  secondary: const Icon(Icons.swap_horiz),
+                  title: Text(strings.reverseCards),
+                  subtitle: Text(strings.reverseCardsBlurb),
+                ),
+              ),
+            ),
           heading(
             strings.codingDrills,
             extra: Text(strings.codeNotesOnly,

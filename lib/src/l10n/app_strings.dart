@@ -284,6 +284,16 @@ class AppStrings {
       _t(n == 1 ? 'Reviewed once' : 'Reviewed $n times', '$n marta takrorlangan', 'Повторений: $n');
   String keyIdeasCount(int n) =>
       _t(n == 1 ? '1 key idea' : '$n key ideas', '$n ta asosiy g‘oya', 'Ключевых идей: $n');
+  String reminderDue(int n, int minutes) => _t(
+      n == 1 ? '1 card waiting · about 1 min' : '$n cards waiting · about $minutes min',
+      '$n ta karta kutmoqda · taxminan $minutes daqiqa',
+      'Ждут повторения: $n · около $minutes мин');
+  String get reverseCards => _t('Ask the other way round', 'Teskari so‘rash', 'Наоборот');
+  String get reverseCardsBlurb => _t('See the answer, recall the term — great for vocabulary.',
+      'Javobni ko‘rib, atamani eslang — lug‘at uchun juda qulay.',
+      'Видите ответ, вспоминаете термин — удобно для слов.');
+  String get whatIsThis => _t('What is it?', 'Bu nima?', 'Что это?');
+  String get editNote => _t('Edit this note', 'Qaydni tahrirlash', 'Изменить заметку');
   String get allTopics => _t('All topics', 'Barcha mavzular', 'Все темы');
   String get topicOptional =>
       _t('Topic (optional)', 'Mavzu (ixtiyoriy)', 'Тема (необязательно)');
@@ -321,8 +331,10 @@ class AppStrings {
   String get reminders => _t('Reminders', 'Eslatmalar', 'Напоминания');
   String get dailyReminder => _t('Daily review reminder',
       'Kunlik takrorlash eslatmasi', 'Ежедневное напоминание');
-  String get dailyReminderSubtitle => _t('A nudge to review your notes',
-      'Qaydlarni takrorlash uchun eslatma', 'Напоминание повторить заметки');
+  String get dailyReminderSubtitle => _t(
+      'Only on days with cards due, saying how many',
+      'Faqat takrorlanadigan kartalar bor kunlari, nechtaligi bilan',
+      'Только в дни, когда есть что повторить, с числом карточек');
   String get reminderTime => _t('Reminder time', 'Eslatma vaqti', 'Время напоминания');
   String get reminderBody => _t(
         'Time to review — your notes are waiting to challenge you.',
