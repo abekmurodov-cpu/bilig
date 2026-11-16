@@ -41,7 +41,13 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
 
   Future<void> _moveSelected() async {
     final strings = context.s;
-    final category = TextEditingController();
+    // Notes from one category start there, so only the topic needs picking.
+    final places = {
+      for (final n in ref.read(notesSortedProvider))
+        if (_selected.contains(n.id)) n.category,
+    };
+    final category = TextEditingController(
+        text: places.length == 1 ? places.first ?? '' : '');
     final topic = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,

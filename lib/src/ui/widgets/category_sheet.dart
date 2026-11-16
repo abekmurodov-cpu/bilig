@@ -2,14 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../l10n/app_strings.dart';
-import '../../llm/llm_providers.dart';
 import '../../models/knowledge_item.dart';
 import '../../models/note_search.dart';
 import '../../practice/practice_models.dart';
 import '../../providers/knowledge_providers.dart';
 import '../../providers/navigation.dart';
 import '../capture_screen.dart';
-import '../sort_topics_screen.dart';
 import 'category_tree.dart';
 import 'note_detail_sheet.dart';
 import 'share_category.dart';
@@ -89,7 +87,6 @@ class _CategorySheet extends ConsumerWidget {
     final scheme = theme.colorScheme;
     final notes = ref.watch(notesByCategoryProvider)[category] ?? const <KnowledgeItem>[];
     final topics = ref.watch(topicInfoProvider)[category] ?? const <CategoryInfo>[];
-    final ai = ref.watch(llmProvider) != null;
     final learned = notes.where((n) => leafLook(n) == LeafLook.green).length;
     final loose = notes.where((n) => n.topic == null).toList();
     void practise(List<KnowledgeItem> queue, {String? topic}) {
@@ -220,23 +217,26 @@ class _CategorySheet extends ConsumerWidget {
             Row(
               children: [
                 Expanded(child: Text(strings.topics, style: theme.textTheme.titleMedium)),
-                if (ai && notes.length >= 4)
-                  TextButton.icon(
-                    onPressed: () {
-                      Navigator.pop(context);
-                      Navigator.of(host).push(MaterialPageRoute(
-                        builder: (_) => SortTopicsScreen(category: category),
-                      ));
-                    },
-                    icon: const Icon(Icons.auto_awesome, size: 18),
-                    label: Text(strings.sortIntoTopics),
-                  ),
+                TextButton.icon(
+                  onPressed: notes.isEmpty
+                      ? null
+                      : () {
+                          final messenger = ScaffoldMessenger.of(host);
+                          _seeNotes(context, ref);
+                          messenger.showSnackBar(SnackBar(
+                            content: Text(strings.organizeHint),
+                            duration: const Duration(seconds: 6),
+                          ));
+                        },
+                  icon: const Icon(Icons.drive_file_move_outlined, size: 18),
+                  label: Text(strings.organizeNotes),
+                ),
               ],
             ),
             if (topics.isEmpty)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
-                child: Text(ai ? strings.noTopicsAi : strings.noTopics,
+                child: Text(strings.noTopics,
                     style: theme.textTheme.bodySmall
                         ?.copyWith(color: scheme.onSurfaceVariant)),
               ),

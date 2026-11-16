@@ -167,6 +167,11 @@ class AppStrings {
   String get generateAnswer =>
       _t('Generate answer', 'Javob yaratish', 'Сгенерировать ответ');
   String get topic => _t('Topic', 'Mavzu', 'Тема');
+  String get organizeNotes => _t('Organize notes', 'Qaydlarni saralash', 'Разложить заметки');
+  String get organizeHint => _t(
+      'Long-press notes to select them, then tap Move to… and pick a topic.',
+      'Qaydlarni tanlash uchun uzoq bosing, so‘ng “Ko‘chirish…” ni bosib mavzuni tanlang.',
+      'Долгим нажатием выделите заметки, затем нажмите «Переместить…» и выберите тему.');
   String get topics => _t('Topics', 'Mavzular', 'Темы');
   String get practiseAll => _t('Practise all', 'Hammasini mashq qilish', 'Повторить всё');
   String get practiseTopic =>
@@ -179,8 +184,6 @@ class AppStrings {
       _t('Rename topic', 'Mavzu nomini o‘zgartirish', 'Переименовать тему');
   String get emptyRemovesTopic => _t('Leave empty to remove the topic',
       'Mavzuni olib tashlash uchun bo‘sh qoldiring', 'Оставьте пустым, чтобы убрать тему');
-  String get sortIntoTopics =>
-      _t('Sort into topics', 'Mavzularga ajratish', 'Разбить на темы');
   String get noTopics => _t(
       'No topics yet. Add one when writing a note, or select notes in Notes '
           '(long-press) and move them to a topic.',
@@ -188,22 +191,8 @@ class AppStrings {
           'bo‘limida qaydlarni tanlab (uzoq bosing) mavzuga o‘tkazing.',
       'Тем пока нет. Добавьте тему при создании заметки или выделите заметки '
           '(долгое нажатие) и перенесите их в тему.');
-  String get noTopicsAi => _t(
-      'No topics yet. Let the AI sort this course into topics, or add them yourself.',
-      'Hali mavzular yo‘q. AI bu kursni mavzularga ajratsin yoki o‘zingiz qo‘shing.',
-      'Тем пока нет. Пусть ИИ разобьёт курс на темы, или добавьте их сами.');
   String withoutTopic(int n) =>
       _t('$n without a topic', '$n tasi mavzusiz', 'Без темы: $n');
-  String sortingTopics(String c) => _t('Sorting “$c” into topics…',
-      '“$c” mavzularga ajratilmoqda…', 'Разбиваем «$c» на темы…');
-  String get sortTopicsBlurb => _t(
-      'Rename a topic with ✎, or tap a note to move it. Nothing changes until you apply.',
-      'Mavzu nomini ✎ bilan o‘zgartiring yoki qaydni bosib boshqa mavzuga o‘tkazing. '
-          'Qo‘llamaguningizcha hech narsa o‘zgarmaydi.',
-      'Переименуйте тему через ✎ или нажмите на заметку, чтобы перенести её. '
-          'Пока вы не примените, ничего не изменится.');
-  String applyTopics(int n) =>
-      _t('Apply $n topics', '$n ta mavzuni qo‘llash', 'Применить темы: $n');
   String notesCount(int n) => _t(n == 1 ? '1 note' : '$n notes', '$n ta qayd', 'Заметок: $n');
   String get tryAgain => _t('Try again', 'Qayta urinish', 'Повторить попытку');
   String selectedCount(int n) => _t('$n selected', '$n ta tanlandi', 'Выбрано: $n');
