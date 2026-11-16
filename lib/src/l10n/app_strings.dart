@@ -280,6 +280,10 @@ class AppStrings {
       'Фото, текст или Markdown, колоды Anki, файлы .bilig');
   String get pickANote => _t('Pick a note to see it here', 'Bu yerda ko‘rish uchun qaydni tanlang',
       'Выберите заметку, чтобы открыть её здесь');
+  String reviewedTimes(int n) =>
+      _t(n == 1 ? 'Reviewed once' : 'Reviewed $n times', '$n marta takrorlangan', 'Повторений: $n');
+  String keyIdeasCount(int n) =>
+      _t(n == 1 ? '1 key idea' : '$n key ideas', '$n ta asosiy g‘oya', 'Ключевых идей: $n');
   String get allTopics => _t('All topics', 'Barcha mavzular', 'Все темы');
   String get topicOptional =>
       _t('Topic (optional)', 'Mavzu (ixtiyoriy)', 'Тема (необязательно)');

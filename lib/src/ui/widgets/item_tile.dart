@@ -37,7 +37,7 @@ class ItemTile extends StatelessWidget {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final muted = theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant);
-    final (statusColor, status) = _status(context);
+    final (statusColor, status) = noteStatus(context, item);
     final chosen = selected ?? false;
     return Card(
       color: chosen
@@ -134,23 +134,24 @@ class ItemTile extends StatelessWidget {
     );
   }
 
-  /// The leaf's color and a word on when the note comes back.
-  (Color, String) _status(BuildContext context) {
-    final now = DateTime.now();
-    final strings = context.s;
-    if (item.lastReviewedAt == null) {
-      return (Theme.of(context).colorScheme.primary, strings.statusNew);
-    }
-    final color = switch (leafLook(item, now: now)) {
-      LeafLook.green => summerLeafColor,
-      LeafLook.gold => autumnLeafColor,
-      LeafLook.wilting || LeafLook.fallen => const Color(0xFF9A6B3F),
-    };
-    if (item.isDue(now)) return (color, strings.statusDue);
-    final today = DateTime(now.year, now.month, now.day);
-    final due = DateTime(item.dueDate.year, item.dueDate.month, item.dueDate.day);
-    return (color, strings.nextIn(due.difference(today).inDays));
+}
+
+/// The leaf's color for [item] and a word on when it comes back.
+(Color, String) noteStatus(BuildContext context, KnowledgeItem item) {
+  final now = DateTime.now();
+  final strings = context.s;
+  if (item.lastReviewedAt == null) {
+    return (Theme.of(context).colorScheme.primary, strings.statusNew);
   }
+  final color = switch (leafLook(item, now: now)) {
+    LeafLook.green => summerLeafColor,
+    LeafLook.gold => autumnLeafColor,
+    LeafLook.wilting || LeafLook.fallen => const Color(0xFF9A6B3F),
+  };
+  if (item.isDue(now)) return (color, strings.statusDue);
+  final today = DateTime(now.year, now.month, now.day);
+  final due = DateTime(item.dueDate.year, item.dueDate.month, item.dueDate.day);
+  return (color, strings.nextIn(due.difference(today).inDays));
 }
 
 /// The note's kind as an icon on a tinted rounded square, one hue per kind.

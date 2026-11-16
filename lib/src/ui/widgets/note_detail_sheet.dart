@@ -248,9 +248,22 @@ class _NoteDetailSheetState extends ConsumerState<NoteDetailView> {
             TypeChip(type: item.type),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(context.s.noteType(item.type).toUpperCase(),
-                  style: theme.textTheme.labelSmall
-                      ?.copyWith(letterSpacing: 1.2)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(context.s.noteType(item.type).toUpperCase(),
+                      style: theme.textTheme.labelSmall?.copyWith(
+                          letterSpacing: 1.2, fontWeight: FontWeight.w700)),
+                  if (item.category != null)
+                    Text(
+                      item.topic == null ? item.category! : '${item.category!} › ${item.topic!}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall
+                          ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                ],
+              ),
             ),
             IconButton(
               // Marker-yellow, so it doesn't read as a second edit button.
@@ -294,46 +307,68 @@ class _NoteDetailSheetState extends ConsumerState<NoteDetailView> {
         NoteBody(
           text: item.front,
           highlights: highlights,
-          style: theme.textTheme.headlineSmall,
+          style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
           marking: marking != null,
           onChanged: onChanged,
         ),
+        const SizedBox(height: 10),
+        _StatusLine(item: item),
         const SizedBox(height: 12),
         NoteImage(noteId: item.id),
-        const Divider(height: 28),
-        if (item.hasAnswer)
-          NoteBody(
-            text: item.back!,
-            highlights: highlights,
-            style: theme.textTheme.bodyLarge,
-            marking: marking != null,
-            onChanged: onChanged,
-          )
-        else
-          Text(
-            context.s.noAnswerYet,
-            style: theme.textTheme.bodyLarge
-                ?.copyWith(fontStyle: FontStyle.italic, color: Colors.grey),
+        const SizedBox(height: 4),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+          decoration: BoxDecoration(
+            color: theme.cardTheme.color,
+            borderRadius: BorderRadius.circular(16),
           ),
-        const SizedBox(height: 16),
-        Wrap(
-          spacing: 6,
-          runSpacing: 4,
-          children: [
-            if (item.category != null)
-              Chip(
-                avatar: const Icon(Icons.folder_outlined, size: 16),
-                label: Text(item.topic == null
-                    ? item.category!
-                    : '${item.category!} › ${item.topic!}'),
-              ),
-            for (final tag in item.tags)
-              Chip(
-                label: Text('#$tag'),
-                visualDensity: VisualDensity.compact,
-              ),
-          ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(context.s.answerLabel,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                      letterSpacing: 1.2,
+                      fontWeight: FontWeight.w700,
+                      color: theme.colorScheme.primary)),
+              const SizedBox(height: 8),
+              if (item.hasAnswer)
+                NoteBody(
+                  // Code reads as code; the marker works on the text as typed.
+                  text: item.type == KnowledgeType.code &&
+                          marking == null &&
+                          !item.back!.trimLeft().startsWith('```')
+                      ? '```\n${item.back!}\n```'
+                      : item.back!,
+                  highlights: highlights,
+                  style: theme.textTheme.bodyLarge?.copyWith(height: 1.5),
+                  marking: marking != null,
+                  onChanged: onChanged,
+                )
+              else
+                Text(
+                  context.s.noAnswerYet,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                      fontStyle: FontStyle.italic,
+                      color: theme.colorScheme.onSurfaceVariant),
+                ),
+            ],
+          ),
         ),
+        if (item.tags.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 6,
+            runSpacing: 4,
+            children: [
+              for (final tag in item.tags)
+                Chip(
+                  label: Text('#$tag'),
+                  visualDensity: VisualDensity.compact,
+                ),
+            ],
+          ),
+        ],
         const Divider(height: 28),
         _QuestionsSection(item: item),
       ],
@@ -856,6 +891,47 @@ class _QuestionDialogState extends State<_QuestionDialog> {
         TextButton(
             onPressed: () => Navigator.of(context).pop(), child: Text(strings.cancel)),
         FilledButton(onPressed: _valid ? _save : null, child: Text(strings.save)),
+      ],
+    );
+  }
+}
+
+/// Where the note stands: when it comes back, how often it was reviewed,
+/// how many key ideas are marked.
+class _StatusLine extends StatelessWidget {
+  const _StatusLine({required this.item});
+
+  final KnowledgeItem item;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = theme.textTheme.labelMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant);
+    final (color, status) = noteStatus(context, item);
+    final reviews = item.repetitions + item.lapses;
+    return Wrap(
+      spacing: 14,
+      runSpacing: 6,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      children: [
+        Row(mainAxisSize: MainAxisSize.min, children: [
+          Container(
+              width: 9, height: 9, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          const SizedBox(width: 6),
+          Text(status, style: muted),
+        ]),
+        if (reviews > 0)
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.replay, size: 14, color: theme.colorScheme.outline),
+            const SizedBox(width: 4),
+            Text(context.s.reviewedTimes(reviews), style: muted),
+          ]),
+        if (item.highlights.isNotEmpty)
+          Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(Icons.border_color, size: 14, color: Colors.amber.shade700),
+            const SizedBox(width: 4),
+            Text(context.s.keyIdeasCount(item.highlights.length), style: muted),
+          ]),
       ],
     );
   }

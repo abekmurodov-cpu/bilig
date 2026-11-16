@@ -18,7 +18,9 @@ import '../../practice/practice_models.dart';
 import '../../practice/text_blanks.dart';
 import '../../providers/knowledge_providers.dart';
 import '../../scheduler/spaced_repetition.dart';
+import '../../providers/study_providers.dart';
 import '../widgets/code_field.dart';
+import '../widgets/confetti.dart';
 import '../widgets/code_highlighter.dart';
 import '../widgets/flip_card.dart';
 import '../theme.dart';
@@ -160,11 +162,16 @@ class _PracticeSessionScreenState
     super.dispose();
   }
 
+  /// Lets go of the blanks' fields once the card showing them has slid away.
   void _disposeBlankControllers() {
-    for (final c in _blankControllers) {
-      c.dispose();
-    }
+    final old = List.of(_blankControllers);
     _blankControllers.clear();
+    if (old.isEmpty) return;
+    Future.delayed(const Duration(milliseconds: 600), () {
+      for (final c in old) {
+        c.dispose();
+      }
+    });
   }
 
   KnowledgeItem get _item => _queue[_index];
@@ -403,8 +410,19 @@ class _PracticeSessionScreenState
     final counted = grade.quality >= 3;
     _history.add(_Graded(_index, _item, grade, counted));
     await ref.read(knowledgeListProvider.notifier).grade(_item, grade);
+    _celebrateGoal();
     if (counted) _correctCount++;
     _advance();
+  }
+
+  /// Confetti the moment today's reviews reach the daily goal.
+  void _celebrateGoal() {
+    if (!mounted) return;
+    final today = ref.read(activityProvider)[dayKey(DateTime.now())]?.reviews ?? 0;
+    final goal = ref.read(dailyGoalProvider);
+    if (today != goal) return;
+    showConfetti(context);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(context.s.goalReached)));
   }
 
   /// A light tap for a good grade, a firmer one for a miss.
@@ -457,6 +475,7 @@ class _PracticeSessionScreenState
     _buzz(grade);
     _history.add(_Graded(_index, _item, grade, correct));
     await ref.read(knowledgeListProvider.notifier).grade(_item, grade);
+    _celebrateGoal();
     if (correct) _correctCount++;
   }
 
@@ -641,6 +660,10 @@ class _PracticeSessionScreenState
   }
 
   Widget _buildBody() {
+    if (_index != _lastIndex) {
+      _direction = _index > _lastIndex ? 1 : -1;
+      _lastIndex = _index;
+    }
     if (_warmingUp) return _buildWarmUp();
     if (_selfCheck) {
       return _buildSelfCheck(
@@ -653,7 +676,7 @@ class _PracticeSessionScreenState
                     : context.s.noAiQuestion,
       );
     }
-    return switch (widget.config.method) {
+    final card = switch (widget.config.method) {
       PracticeMethod.flashcard => _buildFlashcard(),
       PracticeMethod.multipleChoice => _buildMultipleChoice(),
       PracticeMethod.typeAnswer => _buildTypeAnswer(),
@@ -661,7 +684,29 @@ class _PracticeSessionScreenState
       PracticeMethod.fillBlank => _buildFillBlank(),
       PracticeMethod.reorder => _buildReorder(),
     };
+    // Each card slides in from the side it comes from.
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 260),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        final incoming = child.key == ValueKey('card$_index');
+        final from = Offset(incoming ? 0.12 * _direction : -0.12 * _direction, 0);
+        return FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween(begin: from, end: Offset.zero).animate(animation),
+            child: child,
+          ),
+        );
+      },
+      child: KeyedSubtree(key: ValueKey('card$_index'), child: card),
+    );
   }
+
+  /// 1 when moving forward through the cards, -1 when going back.
+  int _direction = 1;
+  int _lastIndex = 0;
 
   Widget _promptCard(BuildContext context, {Widget? extra}) {
     final theme = Theme.of(context);
@@ -1580,8 +1625,16 @@ class _PracticeSessionScreenState
     return [for (final i in items) if (ids.contains(i.id)) i];
   }
 
+  bool _cheered = false;
+
   Widget _buildDone() {
     final theme = Theme.of(context);
+    if (!_cheered && widget.queue.isNotEmpty && _correctCount / widget.queue.length >= 0.8) {
+      _cheered = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) showConfetti(context);
+      });
+    }
     final scheme = theme.colorScheme;
     final total = widget.queue.length;
     final share = total == 0 ? 0.0 : _correctCount / total;
