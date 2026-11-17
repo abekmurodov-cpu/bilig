@@ -1,6 +1,6 @@
 // Where the downloads live: the newest GitHub release. Each build is uploaded
 // under the same file name, so these links always give the latest version.
-const REPO = 'https://github.com/abekmurodov-cpu/tom_riddle';
+const REPO = 'https://github.com/abekmurodov-cpu/bilig';
 const LATEST = `${REPO}/releases/latest/download/`;
 
 // ---------- Translations (English is in the page itself) ----------

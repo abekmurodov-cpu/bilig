@@ -7,7 +7,7 @@ and brings it back right before you'd forget it, using spaced repetition.
 Runs on Android, iPhone/iPad, macOS, Windows and Linux. Built with Flutter.
 The app speaks O‘zbekcha, Русский and English.
 
-- Website and downloads: <https://abekmurodov-cpu.github.io/tom_riddle/>
+- Website and downloads: <https://abekmurodov-cpu.github.io/bilig/>
 - Releasing and app stores: [packaging/README.md](packaging/README.md)
 
 ## Develop

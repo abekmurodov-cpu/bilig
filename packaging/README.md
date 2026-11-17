@@ -33,7 +33,7 @@ secrets the Android build is skipped.
 
 `website/` is published to GitHub Pages by the **Website** workflow on every
 push to `main` that touches it. One-time setup: Settings → Pages → Source:
-**GitHub Actions**. Address: `https://abekmurodov-cpu.github.io/tom_riddle/`.
+**GitHub Actions**. Address: `https://abekmurodov-cpu.github.io/bilig/`.
 
 ## Stores
 
