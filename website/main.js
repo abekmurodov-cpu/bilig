@@ -167,6 +167,7 @@ function setLanguage(lang) {
   document.querySelectorAll('.lang button').forEach((b) => b.classList.toggle('on', b.dataset.lang === lang));
   localStorage.setItem('bilig-lang', lang);
   showHeroDownload(lang);
+  showCounts(lang);
 }
 
 // ---------- Downloads ----------
@@ -219,6 +220,59 @@ if (os) {
     card.parentElement.prepend(card);
   }
 }
+
+// ---------- Download counts ----------
+
+// GitHub counts every download of every release file; the page adds them up.
+// Kept for 10 minutes so visitors don't use up GitHub's limit for them.
+const COUNT_KEY = 'bilig-downloads';
+const OS_OF_FILE = [[/windows/i, 'windows'], [/macos/i, 'mac'], [/linux/i, 'linux'], [/android/i, 'android']];
+let counts = null;
+
+async function loadCounts() {
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(COUNT_KEY) || 'null');
+    if (cached && Date.now() - cached.at < 10 * 60 * 1000) return cached.counts;
+  } catch (_) { /* ignore a broken cache */ }
+  const api = REPO.replace('https://github.com/', 'https://api.github.com/repos/');
+  const res = await fetch(`${api}/releases?per_page=100`);
+  if (!res.ok) return null;
+  const sums = { all: 0, windows: 0, mac: 0, linux: 0, android: 0 };
+  for (const release of await res.json()) {
+    for (const asset of release.assets || []) {
+      const match = OS_OF_FILE.find(([re]) => re.test(asset.name));
+      if (!match) continue;
+      sums[match[1]] += asset.download_count;
+      sums.all += asset.download_count;
+    }
+  }
+  sessionStorage.setItem(COUNT_KEY, JSON.stringify({ at: Date.now(), counts: sums }));
+  return sums;
+}
+
+function downloadsText(n, lang) {
+  const num = new Intl.NumberFormat(lang === 'uz' ? 'uz-Latn' : lang).format(n);
+  if (lang === 'uz') return `${num} marta yuklab olingan`;
+  if (lang === 'ru') {
+    const form = new Intl.PluralRules('ru').select(n);
+    return `${num} ${{ one: 'загрузка', few: 'загрузки' }[form] || 'загрузок'}`;
+  }
+  return `${num} ${n === 1 ? 'download' : 'downloads'}`;
+}
+
+function showCounts(lang) {
+  if (!counts) return;
+  document.querySelectorAll('[data-count]').forEach((el) => {
+    const n = counts[el.dataset.count] || 0;
+    el.textContent = el.dataset.count === 'all' ? `⬇ ${downloadsText(n, lang)}` : downloadsText(n, lang);
+    el.hidden = n === 0;
+  });
+}
+
+loadCounts().then((c) => {
+  counts = c;
+  showCounts(document.documentElement.lang);
+}).catch(() => { /* no counts offline or when GitHub says no */ });
 
 // ---------- Language ----------
 

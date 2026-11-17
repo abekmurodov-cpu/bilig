@@ -197,3 +197,9 @@ footer { display: flex; justify-content: space-between; padding: 30px clamp(20px
   .reveal { opacity: 1; transform: none; transition: none; }
 }
 .footer-links { display: flex; gap: 22px; }
+
+/* Download counts */
+.dl-count { display: inline-block; margin: 10px 0 0; padding: 5px 12px; border-radius: 999px; background: var(--soft); color: var(--primary); font-size: 14px; font-weight: 600; }
+.dl-count.center-block { display: table; margin: -24px auto 36px; }
+.dl-count[hidden] { display: none; }
+.card-count { font-size: 12px; color: var(--muted); margin-top: 10px; }

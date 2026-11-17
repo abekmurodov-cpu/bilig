@@ -40,6 +40,7 @@
         <a class="btn btn-ghost" href="#download" data-i18n="hero.all">All platforms</a>
       </div>
       <p class="fine" id="hero-fine" data-i18n="hero.fine">No account needed. Your notes stay on your device.</p>
+      <p class="dl-count" data-count="all" hidden></p>
     </div>
     <div class="hero-art">
       <div class="laptop">
@@ -137,6 +138,7 @@
   <section class="download" id="download">
     <h2 data-i18n="dl.title">Download Bilig</h2>
     <p class="lead center" data-i18n="dl.lead">Free. Pick your device.</p>
+    <p class="dl-count center-block" data-count="all" hidden></p>
 
     <div class="platforms">
       <div class="platform" data-os="windows">
@@ -145,12 +147,14 @@
         <p class="req">Windows 10 / 11 · 64-bit</p>
         <a class="btn" data-file="Bilig-Windows-Setup.exe" data-i18n="dl.install">Installer (.exe)</a>
         <a class="alt" data-file="Bilig-Windows.zip" data-i18n="dl.zip">Portable .zip</a>
+        <span class="card-count" data-count="windows"></span>
       </div>
       <div class="platform" data-os="mac">
         <div class="p-icon"><svg viewBox="0 0 24 24"><path d="M16.4 12.6c0-2.4 2-3.5 2-3.6-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.2-2.8.8-3.5.8s-1.8-.8-3-.8C6.9 7.3 5.4 8.2 4.6 9.7c-1.7 2.9-.4 7.2 1.2 9.6.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8s1.9.8 3.1.8c1.3 0 2.1-1.2 2.9-2.4.9-1.3 1.3-2.6 1.3-2.7 0 0-2.7-1-2.8-4zM14.1 5.5c.6-.8 1.1-1.9 1-3-1 0-2.1.6-2.8 1.4-.6.7-1.1 1.8-1 2.9 1 .1 2.1-.5 2.8-1.3z"/></svg></div>
         <h3>macOS</h3>
         <p class="req">macOS 10.15+ · Apple silicon &amp; Intel</p>
         <a class="btn" data-file="Bilig-macOS.dmg" data-i18n="dl.dmg">Download (.dmg)</a>
+        <span class="card-count" data-count="mac"></span>
       </div>
       <div class="platform" data-os="linux">
         <div class="p-icon"><svg viewBox="0 0 24 24"><path d="M12 2c-2.2 0-3.4 1.9-3.4 4.4 0 1.5.2 2.5-.6 3.8C6.8 12 5 14 5 16.6c0 .6.1 1.1.3 1.6-.6.3-1.3.6-1.3 1.3 0 .9 1.5 1 2.6 1.4 1 .4 1.6 1.1 2.6 1.1.8 0 1.3-.5 1.6-.9h2.4c.3.4.8.9 1.6.9 1 0 1.6-.7 2.6-1.1 1.1-.4 2.6-.5 2.6-1.4 0-.7-.7-1-1.3-1.3.2-.5.3-1 .3-1.6 0-2.6-1.8-4.6-3-6.4-.8-1.3-.6-2.3-.6-3.8C15.4 3.9 14.2 2 12 2zm-1.4 3.6c.4 0 .7.5.7 1.1s-.3 1-.7 1-.7-.4-.7-1 .3-1.1.7-1.1zm2.8 0c.4 0 .7.5.7 1.1s-.3 1-.7 1-.7-.4-.7-1 .3-1.1.7-1.1zM12 8.3c.8 0 1.8.5 1.8.9s-1 1.1-1.8 1.1-1.8-.7-1.8-1.1.9-.9 1.8-.9z"/></svg></div>
@@ -158,6 +162,7 @@
         <p class="req">Ubuntu, Debian, Mint · x64</p>
         <a class="btn" data-file="Bilig-Linux-amd64.deb" data-i18n="dl.deb">Debian, Ubuntu (.deb)</a>
         <a class="alt" data-file="Bilig-Linux-x64.tar.gz" data-i18n="dl.tar">Any distro (.tar.gz)</a>
+        <span class="card-count" data-count="linux"></span>
       </div>
       <div class="platform" data-os="android">
         <div class="p-icon"><svg viewBox="0 0 24 24"><path d="M17.5 9.4 19.2 6.5a.4.4 0 0 0-.7-.4l-1.7 3A10.4 10.4 0 0 0 12 8a10.4 10.4 0 0 0-4.8 1.1l-1.7-3a.4.4 0 0 0-.7.4l1.7 2.9A9.6 9.6 0 0 0 2 17h20a9.6 9.6 0 0 0-4.5-7.6zM7 14.3a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm10 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg></div>
@@ -165,6 +170,7 @@
         <p class="req">Android 7+</p>
         <a class="btn" data-file="Bilig-Android.apk" data-i18n="dl.apk">Download (.apk)</a>
         <span class="alt muted" data-i18n="dl.play">Google Play — soon</span>
+        <span class="card-count" data-count="android"></span>
       </div>
       <div class="platform" data-os="ios">
         <div class="p-icon"><svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10.5 18.5h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
