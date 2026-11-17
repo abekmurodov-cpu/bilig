@@ -1,11 +1,11 @@
 {
-    "name": "knowledge",
-    "short_name": "knowledge",
+    "name": "Bilig",
+    "short_name": "Bilig",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#5B6CF0",
+    "theme_color": "#5B6CF0",
+    "description": "Bilig: notes that quiz you back.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

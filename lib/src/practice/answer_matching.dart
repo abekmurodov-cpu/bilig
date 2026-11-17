@@ -3,7 +3,8 @@
 String normalizeAnswer(String input) {
   return input
       .toLowerCase()
-      .replaceAll(RegExp(r'[^\w\s]'), ' ')
+      // Letters of any script (a plain \w would wipe out Cyrillic).
+      .replaceAll(RegExp(r'[^\p{L}\p{N}\s]', unicode: true), ' ')
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
 }
@@ -53,4 +54,18 @@ bool isAnswerCorrect(String guess, String expected, {double threshold = 0.85}) {
   // short keyword-style answers.
   if (e.isNotEmpty && (g.contains(e) || e.contains(g))) return true;
   return similarity(g, e) >= threshold;
+}
+
+/// A stricter check than [isAnswerCorrect], used to accept a typed answer
+/// **without** asking the AI: the guess must match the expected answer
+/// (allowing typos) or contain it whole. Unlike [isAnswerCorrect] it never
+/// accepts a guess just because it is a fragment of the expected answer, so a
+/// lazy "the" can't pass for "the mitochondria".
+bool isConfidentlyCorrect(String guess, String expected) {
+  final g = normalizeAnswer(guess);
+  final e = normalizeAnswer(expected);
+  if (g.isEmpty || e.isEmpty) return false;
+  if (g == e) return true;
+  if (' $g '.contains(' $e ')) return true;
+  return similarity(g, e) >= 0.9;
 }

@@ -1,22 +1,40 @@
 import '../models/knowledge_item.dart';
+import 'code_drills.dart';
+import 'text_blanks.dart';
 
-/// How the user is quizzed during a practice session.
+/// How the user is quizzed during a practice session. Writing and reordering
+/// code are the "coding branch": they only apply to code notes. Fill in the
+/// blank works on every note (code notes blank code tokens, others key words).
 enum PracticeMethod {
   flashcard,
   multipleChoice,
-  typeAnswer;
+  typeAnswer,
+  codeSnippet,
+  fillBlank,
+  reorder;
 
   String get label => switch (this) {
         PracticeMethod.flashcard => 'Flashcard',
         PracticeMethod.multipleChoice => 'Multiple choice',
         PracticeMethod.typeAnswer => 'Type the answer',
+        PracticeMethod.codeSnippet => 'Write the code',
+        PracticeMethod.fillBlank => 'Fill in the blank',
+        PracticeMethod.reorder => 'Reorder the code',
       };
 
   String get blurb => switch (this) {
         PracticeMethod.flashcard => 'Reveal the answer and grade yourself.',
         PracticeMethod.multipleChoice => 'Pick the right answer from options.',
         PracticeMethod.typeAnswer => 'Type it; checked by match or AI.',
+        PracticeMethod.codeSnippet =>
+          'Rewrite the snippet; graded on working syntax, not an exact match.',
+        PracticeMethod.fillBlank => 'Type the key words taken out of the note.',
+        PracticeMethod.reorder => 'Drag the shuffled code lines back into order.',
       };
+
+  /// True for the coding-only drills, which quiz code-type notes.
+  bool get isCoding =>
+      this == PracticeMethod.codeSnippet || this == PracticeMethod.reorder;
 }
 
 /// Which notes a practice session draws from.
@@ -49,11 +67,24 @@ class PracticeConfig {
     required this.method,
     required this.scope,
     this.category,
+    this.topic,
+    this.reverse = false,
   });
 
   final PracticeMethod method;
   final PracticeScope scope;
   final String? category;
+
+  /// With [category]: only this topic of it.
+  final String? topic;
+
+  /// Asks the other way round: shows the answer, recall the prompt (terms,
+  /// vocabulary). Flashcards and typed answers only; notes need an answer.
+  final bool reverse;
+
+  /// Whether [method] can be asked the other way round.
+  static bool canReverse(PracticeMethod method) =>
+      method == PracticeMethod.flashcard || method == PracticeMethod.typeAnswer;
 
   /// Builds the queue from [all] (every note) and [due] (currently-due notes),
   /// filtered by scope. Multiple-choice and type-the-answer need something to
@@ -69,11 +100,27 @@ class PracticeConfig {
       PracticeScope.all => all,
       PracticeScope.due => due,
       PracticeScope.weakPoints => all.where((i) => i.isWeak),
-      PracticeScope.category =>
-        all.where((i) => (i.category?.trim() ?? '') == category?.trim()),
+      PracticeScope.category => all.where((i) =>
+          (i.category?.trim() ?? '') == category?.trim() &&
+          (topic == null || i.topic == topic)),
     };
 
-    if ((method == PracticeMethod.multipleChoice ||
+    if (reverse && canReverse(method)) {
+      pool = pool.where((i) => i.hasAnswer);
+    } else if (method == PracticeMethod.fillBlank) {
+      pool = pool.where((i) => i.type == KnowledgeType.code
+          ? _canFillBlank(i)
+          : _canTextBlank(i));
+    } else if (method.isCoding) {
+      // Coding drills quiz code notes whose snippet (in the answer/back field)
+      // can actually produce the drill.
+      pool = pool.where((i) => i.type == KnowledgeType.code).where((i) {
+        return switch (method) {
+          PracticeMethod.reorder => _canReorder(i),
+          _ => i.hasAnswer, // codeSnippet: needs the reference code in back
+        };
+      });
+    } else if ((method == PracticeMethod.multipleChoice ||
             method == PracticeMethod.typeAnswer) &&
         !canGenerate) {
       pool = pool.where((i) => i.hasAnswer);
@@ -82,4 +129,18 @@ class PracticeConfig {
     final queue = pool.toList()..shuffle();
     return queue;
   }
+
+  static bool _canFillBlank(KnowledgeItem i) =>
+      _drillable[i] ??= generateCodeDrills(i.back ?? '').fillBlankAnswers.isNotEmpty;
+
+  static bool _canReorder(KnowledgeItem i) =>
+      _reorderable[i] ??= generateCodeDrills(i.back ?? '').reorderSegments.length > 1;
+
+  static bool _canTextBlank(KnowledgeItem i) => _blankable[i] ??= textBlanks(i) != null;
+
+  // Whether a note can make each drill, worked out once per version of the
+  // note: the Practice screen counts every scope on each redraw.
+  static final _drillable = Expando<bool>('fillBlank');
+  static final _reorderable = Expando<bool>('reorder');
+  static final _blankable = Expando<bool>('textBlank');
 }

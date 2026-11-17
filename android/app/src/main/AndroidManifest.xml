@@ -5,8 +5,14 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
     <uses-permission android:name="android.permission.VIBRATE"/>
+    <!-- Voice notes: on-device speech recognition and AI transcription. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- Fire the daily reminder on time (exact alarms). USE_EXACT_ALARM is
+         auto-granted on Android 13+; SCHEDULE_EXACT_ALARM covers 12. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM"/>
     <application
-        android:label="knowledge"
+        android:label="Bilig"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -30,7 +36,36 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+            <!-- "Share → Bilig" from other apps: text becomes a note, a photo
+                 becomes notes (see MainActivity). -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="text/plain"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="image/*"/>
+            </intent-filter>
+            <!-- Files: a category a classmate shared (.bilig), Anki decks. -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="application/*"/>
+            </intent-filter>
         </activity>
+        <!-- Home-screen widget: the tree and how many notes are due. -->
+        <receiver
+            android:name=".BiligWidgetProvider"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/bilig_widget_info"/>
+        </receiver>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
@@ -59,6 +94,10 @@
 
          In particular, this is used by the Flutter engine in io.flutter.plugin.text.ProcessTextPlugin. -->
     <queries>
+        <!-- On-device speech recognition (voice notes), Android 11+. -->
+        <intent>
+            <action android:name="android.speech.RecognitionService"/>
+        </intent>
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>

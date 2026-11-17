@@ -3,13 +3,35 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/app_strings.dart';
 import '../llm/llm_providers.dart';
+import '../models/highlights.dart';
 import '../models/knowledge_item.dart';
 import '../providers/knowledge_providers.dart';
+import 'bulk_add_screen.dart';
 import 'widgets/image_picking.dart';
+import 'widgets/category_field.dart';
+import 'widgets/format_bar.dart';
+import 'widgets/markable_text.dart';
+import 'widgets/voice_input.dart';
+import 'theme.dart';
 
 class CaptureScreen extends ConsumerStatefulWidget {
-  const CaptureScreen({super.key});
+  const CaptureScreen({
+    super.key,
+    this.initialFront,
+    this.initialBack,
+    this.initialCategory,
+    this.initialTopic,
+  });
+
+  /// Prefilled text, e.g. shared from another app.
+  final String? initialFront;
+  final String? initialBack;
+
+  /// Prefilled place, when adding from a category or topic.
+  final String? initialCategory;
+  final String? initialTopic;
 
   @override
   ConsumerState<CaptureScreen> createState() => _CaptureScreenState();
@@ -17,27 +39,86 @@ class CaptureScreen extends ConsumerStatefulWidget {
 
 class _CaptureScreenState extends ConsumerState<CaptureScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _frontController = TextEditingController();
-  final _backController = TextEditingController();
-  final _categoryController = TextEditingController();
+  late final _frontController = HighlightingController()
+    ..text = widget.initialFront ?? '';
+  late final _backController = HighlightingController()
+    ..text = widget.initialBack ?? '';
+  late final _categoryController = TextEditingController(text: widget.initialCategory);
+  late final _topicController = TextEditingController(text: widget.initialTopic);
+  final _tagsController = TextEditingController();
   KnowledgeType _type = KnowledgeType.concept;
   bool _saving = false;
   bool _aiBusy = false;
   Uint8List? _imageBytes;
-  // Pre-generated quiz, cached when the answer is AI-generated.
-  String? _quizQuestion;
-  String? _mcAnswer;
-  List<String> _mcDistractors = const [];
+
+  /// Key ideas marked while writing (select text → Highlight).
+  List<String> _highlights = const [];
+
+  void _setHighlights(List<String> highlights) {
+    if (highlights.length > KnowledgeItem.maxHighlights) {
+      _showError(context.s.tooManyHighlights);
+      return;
+    }
+    setState(() {
+      _highlights = highlights;
+      _frontController.highlights = highlights;
+      _backController.highlights = highlights;
+    });
+  }
+
+  KnowledgeItem _draft() {
+    final now = DateTime.now();
+    final back = _backController.text.trim();
+    return KnowledgeItem(
+      id: '',
+      front: _frontController.text.trim(),
+      back: back.isEmpty ? null : back,
+      type: _type,
+      createdAt: now,
+      dueDate: now,
+    );
+  }
+
+  Future<void> _suggestKeyIdeas() async {
+    final strings = context.s;
+    final llm = ref.read(llmProvider);
+    if (llm == null || _frontController.text.trim().isEmpty) return;
+    setState(() => _aiBusy = true);
+    try {
+      final suggested = await llm.suggestHighlights(_draft());
+      var next = _highlights;
+      for (final phrase in suggested) {
+        final grown = addPhrase(next, phrase);
+        if (grown.length > KnowledgeItem.maxHighlights) break;
+        next = grown;
+      }
+      if (!mounted) return;
+      if (next.length == _highlights.length) _showError(strings.noNewKeyIdeas);
+      _setHighlights(next);
+    } catch (e) {
+      _showError(strings.couldNotSuggest(e));
+    } finally {
+      if (mounted) setState(() => _aiBusy = false);
+    }
+  }
+
+  Widget _highlightMenu(
+          BuildContext context, EditableTextState state, TextEditingController c) =>
+      highlightContextMenu(context, state,
+          text: c.text, highlights: _highlights, onChanged: _setHighlights);
 
   @override
   void dispose() {
     _frontController.dispose();
     _backController.dispose();
     _categoryController.dispose();
+    _topicController.dispose();
+    _tagsController.dispose();
     super.dispose();
   }
 
   Future<void> _expandWithAi() async {
+    final strings = context.s;
     final llm = ref.read(llmProvider);
     if (llm == null) return;
     final front = _frontController.text.trim();
@@ -53,29 +134,19 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
         createdAt: now,
         dueDate: now,
       );
-      // Fill the detailed answer, then pre-build a concise MC quiz to cache.
+      // Only the answer is generated here; the practice quiz is batched in
+      // the background after saving (see QuizPrep), saving a request.
       final answer = await llm.expandNote(probe);
       if (mounted) _backController.text = answer;
-      try {
-        final quiz = await llm.generateQuiz(probe.copyWith(back: answer));
-        _mcAnswer = quiz.answer;
-        _mcDistractors = quiz.distractors;
-        // Reword content notes (fact, code, command, concept) into a real
-        // question so practice asks it instead of echoing the note. Notes
-        // already phrased as a question keep their own prompt.
-        _quizQuestion =
-            _type != KnowledgeType.question ? quiz.question : null;
-      } catch (_) {
-        // Non-fatal: the quiz will be generated lazily during practice.
-      }
     } catch (e) {
-      _showError('Could not generate: $e');
+      _showError(strings.couldNotGenerate(e));
     } finally {
       if (mounted) setState(() => _aiBusy = false);
     }
   }
 
   Future<void> _suggestCategory() async {
+    final strings = context.s;
     final llm = ref.read(llmProvider);
     if (llm == null) return;
     final front = _frontController.text.trim();
@@ -88,7 +159,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
       );
       if (mounted) _categoryController.text = cat;
     } catch (e) {
-      _showError('Could not suggest: $e');
+      _showError(strings.couldNotSuggest(e));
     } finally {
       if (mounted) setState(() => _aiBusy = false);
     }
@@ -108,12 +179,25 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
           back: _backController.text,
           type: _type,
           category: _categoryController.text,
+          topic: _topicController.text,
           imageBytes: _imageBytes,
-          quizQuestion: _quizQuestion,
-          mcAnswer: _mcAnswer,
-          mcDistractors: _mcDistractors,
+          highlights: _highlights,
+          tags: KnowledgeItem.parseTags(_tagsController.text),
         );
     if (mounted) Navigator.of(context).pop();
+  }
+
+  /// Many notes at once replace this single one: go there and close this.
+  Future<void> _openBulk(BulkSource source) async {
+    final navigator = Navigator.of(context);
+    await navigator.pushReplacement(MaterialPageRoute(
+      builder: (_) => BulkAddScreen(
+        source: source,
+        initialText: source == BulkSource.text && _backController.text.isNotEmpty
+            ? _backController.text
+            : null,
+      ),
+    ));
   }
 
   Future<void> _pickImage() async {
@@ -125,13 +209,30 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
   Widget build(BuildContext context) {
     final aiAttached = ref.watch(llmProvider) != null;
     return Scaffold(
-      appBar: AppBar(title: const Text('Capture knowledge')),
-      body: Form(
+      appBar: AppBar(title: Text(context.s.captureTitle)),
+      body: ReadableWidth(child: Form(
         key: _formKey,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text('What kind of thing is this?',
+            Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              children: [
+                ActionChip(
+                  avatar: const Icon(Icons.photo_camera_outlined, size: 18),
+                  label: Text(context.s.photoToNotes),
+                  onPressed: () => _openBulk(BulkSource.photo),
+                ),
+                ActionChip(
+                  avatar: const Icon(Icons.content_paste, size: 18),
+                  label: Text(context.s.pasteAndSplit),
+                  onPressed: () => _openBulk(BulkSource.text),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(context.s.whatKind,
                 style: Theme.of(context).textTheme.labelLarge),
             const SizedBox(height: 8),
             Wrap(
@@ -139,7 +240,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
               children: [
                 for (final type in KnowledgeType.values)
                   ChoiceChip(
-                    label: Text(type.label),
+                    label: Text(context.s.noteType(type)),
                     selected: _type == type,
                     onSelected: (_) => setState(() => _type = type),
                   ),
@@ -152,14 +253,16 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
               minLines: 1,
               maxLines: 4,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                labelText: 'Prompt',
+              contextMenuBuilder: (context, state) =>
+                  _highlightMenu(context, state, _frontController),
+              decoration: InputDecoration(
+                labelText: context.s.prompt,
                 hintText:
-                    'A question, a concept name, a command — what to recall',
-                border: OutlineInputBorder(),
+                    context.s.promptHint,
+                suffixIcon: VoiceButton(controller: _frontController),
               ),
               validator: (v) =>
-                  (v == null || v.trim().isEmpty) ? 'Add something to recall' : null,
+                  (v == null || v.trim().isEmpty) ? context.s.promptRequired : null,
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -167,12 +270,16 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
               minLines: 2,
               maxLines: 8,
               textCapitalization: TextCapitalization.sentences,
-              decoration: const InputDecoration(
-                labelText: 'Answer / details (optional)',
-                hintText: 'Leave blank if you only jotted a fragment',
-                border: OutlineInputBorder(),
+              contextMenuBuilder: (context, state) =>
+                  _highlightMenu(context, state, _backController),
+              decoration: InputDecoration(
+                labelText: context.s.answerOptional,
+                hintText: context.s.answerHint,
+                suffixIcon: VoiceButton(controller: _backController),
               ),
             ),
+            const SizedBox(height: 8),
+            FormatBar(controller: _backController),
             if (aiAttached) ...[
               const SizedBox(height: 8),
               Align(
@@ -185,30 +292,41 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.auto_awesome, size: 18),
-                  label: const Text('Generate answer'),
+                  label: Text(context.s.generateAnswer),
                 ),
               ),
             ],
+            const SizedBox(height: 8),
+            _KeyIdeas(
+              highlights: _highlights,
+              onRemove: (h) =>
+                  _setHighlights([for (final x in _highlights) if (x != h) x]),
+              onSuggest: aiAttached && !_aiBusy ? _suggestKeyIdeas : null,
+            ),
             const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: TextFormField(
-                    controller: _categoryController,
-                    decoration: const InputDecoration(
-                      labelText: 'Category (optional)',
-                      hintText: 'e.g. Math, ML, Linux, Cybersec',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ),
-                if (aiAttached)
-                  IconButton(
-                    tooltip: 'Suggest category',
-                    onPressed: _aiBusy ? null : _suggestCategory,
-                    icon: const Icon(Icons.auto_awesome),
-                  ),
-              ],
+            CategoryField(
+              controller: _categoryController,
+              trailing: aiAttached
+                  ? Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: IconButton(
+                        tooltip: context.s.suggestCategory,
+                        onPressed: _aiBusy ? null : _suggestCategory,
+                        icon: const Icon(Icons.auto_awesome),
+                      ),
+                    )
+                  : null,
+            ),
+            const SizedBox(height: 12),
+            TopicField(controller: _topicController, category: _categoryController),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _tagsController,
+              decoration: InputDecoration(
+                labelText: context.s.tagsField,
+                hintText: context.s.tagsHint,
+                prefixIcon: const Icon(Icons.sell_outlined),
+              ),
             ),
             const SizedBox(height: 16),
             if (_imageBytes != null) ...[
@@ -235,7 +353,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
             OutlinedButton.icon(
               onPressed: _pickImage,
               icon: const Icon(Icons.image_outlined),
-              label: Text(_imageBytes == null ? 'Add image' : 'Replace image'),
+              label: Text(_imageBytes == null ? context.s.addImage : context.s.replaceImage),
             ),
             const SizedBox(height: 24),
             FilledButton.icon(
@@ -247,10 +365,73 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.check),
-              label: const Text('Save'),
+              label: Text(context.s.save),
             ),
           ],
         ),
+      )),
+    );
+  }
+}
+
+/// The marked key ideas while writing a note, with how to mark them and the
+/// AI's suggestions.
+class _KeyIdeas extends StatelessWidget {
+  const _KeyIdeas({required this.highlights, required this.onRemove, this.onSuggest});
+
+  final List<String> highlights;
+  final ValueChanged<String> onRemove;
+  final VoidCallback? onSuggest;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 8, 4, 8),
+      decoration: BoxDecoration(
+        color: markerColor(context).withValues(alpha: 0.3),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.border_color, size: 18, color: Colors.amber.shade800),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(context.s.captureMarkerHint,
+                    style: theme.textTheme.bodySmall),
+              ),
+            ],
+          ),
+          if (highlights.isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 4,
+              children: [
+                for (final h in highlights)
+                  InputChip(
+                    label: Text(h),
+                    backgroundColor: markerColor(context),
+                    side: BorderSide.none,
+                    visualDensity: VisualDensity.compact,
+                    onDeleted: () => onRemove(h),
+                  ),
+              ],
+            ),
+          ],
+          if (onSuggest != null)
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: onSuggest,
+                icon: const Icon(Icons.auto_awesome, size: 18),
+                label: Text(context.s.suggestKeyIdeas),
+              ),
+            ),
+        ],
       ),
     );
   }

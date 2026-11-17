@@ -1,5 +1,5 @@
 name: knowledge
-description: "A new Flutter project."
+description: "Bilig: notes that quiz you back."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+version: 1.2.0+3
 
 environment:
   sdk: ^3.12.2
@@ -29,6 +29,8 @@ environment:
 # versions available, run `flutter pub outdated`.
 dependencies:
   flutter:
+    sdk: flutter
+  flutter_localizations:
     sdk: flutter
 
   # The following adds the Cupertino Icons font to your application.
@@ -43,6 +45,17 @@ dependencies:
   flutter_local_notifications: ^19.4.0
   timezone: ^0.10.0
   flutter_timezone: ^4.1.0
+  flutter_secure_storage: ^11.2.0
+  url_launcher: ^6.3.3
+  speech_to_text: ^7.5.0
+  record: ^7.2.0
+  archive: ^4.7.1
+  file_selector: ^1.1.0
+  share_plus: ^13.3.1
+  home_widget: ^0.10.0
+  flutter_math_fork: ^0.7.4
+  desktop_drop: ^0.8.4
+  path_provider: ^2.1.6
 
 dev_dependencies:
   flutter_test:
@@ -65,6 +78,31 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+  assets:
+    - assets/logo/
+
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-Regular.ttf
+        - asset: assets/fonts/Inter-Italic.ttf
+          style: italic
+        - asset: assets/fonts/Inter-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-Bold.ttf
+          weight: 700
+    - family: SourceSerif
+      fonts:
+        - asset: assets/fonts/SourceSerif4-Regular.ttf
+        - asset: assets/fonts/SourceSerif4-It.ttf
+          style: italic
+        - asset: assets/fonts/SourceSerif4-Semibold.ttf
+          weight: 600
+        - asset: assets/fonts/SourceSerif4-Bold.ttf
+          weight: 700
 
   # To add assets to your application, add an assets section, like this:
   # assets:

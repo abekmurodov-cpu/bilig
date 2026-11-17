@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Bilig
+GenericName=Flashcards and notes
+Comment=Notes that quiz you back
+Exec=/opt/bilig/bilig %U
+Icon=bilig
+Terminal=false
+Categories=Education;Office;
+Keywords=notes;flashcards;study;spaced repetition;quiz;
+StartupWMClass=com.arximed.knowledge

@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/secret_store.dart';
 import '../data/settings_repository.dart';
 import '../providers/knowledge_providers.dart';
 import '../providers/settings_providers.dart';
@@ -22,12 +25,15 @@ class TelegramConfig {
 }
 
 /// Persists the attached Telegram config; null when detached.
+/// The bot token lives in [SecretStore]; chat id and display name in settings.
 class TelegramConfigNotifier extends Notifier<TelegramConfig?> {
   SettingsRepository get _s => ref.read(settingsRepositoryProvider);
+  SecretStore get _secrets => ref.read(secretStoreProvider);
 
   @override
   TelegramConfig? build() {
-    final token = _s.getString(SettingsRepository.kTelegramBotToken);
+    _migrateLegacyToken();
+    final token = _secrets.read(SecretStore.kTelegramBotToken);
     final chatId = _s.getString(SettingsRepository.kTelegramChatId);
     if (token == null || chatId == null) return null;
     return TelegramConfig(
@@ -37,15 +43,25 @@ class TelegramConfigNotifier extends Notifier<TelegramConfig?> {
     );
   }
 
+  /// Tokens used to be kept in plain settings; move one into secure storage.
+  /// The store's in-memory copy updates at once, so build() reads it now.
+  void _migrateLegacyToken() {
+    final legacy = _s.getString(SettingsRepository.kTelegramBotToken);
+    if (legacy == null) return;
+    unawaited(_secrets
+        .write(SecretStore.kTelegramBotToken, legacy)
+        .then((_) => _s.setString(SettingsRepository.kTelegramBotToken, null)));
+  }
+
   Future<void> attach(TelegramConfig config) async {
-    await _s.setString(SettingsRepository.kTelegramBotToken, config.botToken);
+    await _secrets.write(SecretStore.kTelegramBotToken, config.botToken);
     await _s.setString(SettingsRepository.kTelegramChatId, config.chatId);
     await _s.setString(SettingsRepository.kTelegramUser, config.user);
     state = config;
   }
 
   Future<void> detach() async {
-    await _s.setString(SettingsRepository.kTelegramBotToken, null);
+    await _secrets.write(SecretStore.kTelegramBotToken, null);
     await _s.setString(SettingsRepository.kTelegramChatId, null);
     await _s.setString(SettingsRepository.kTelegramUser, null);
     state = null;

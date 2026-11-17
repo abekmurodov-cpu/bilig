@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/secret_store.dart';
 import '../data/settings_repository.dart';
+import '../l10n/app_strings.dart';
 
-/// Bound to the concrete repository in `main` via a ProviderScope override,
-/// mirroring [knowledgeRepositoryProvider].
-final settingsRepositoryProvider = Provider<SettingsRepository>((ref) {
-  throw UnimplementedError('settingsRepositoryProvider must be overridden');
-});
+/// Bound to the real secure store in `main`; in-memory otherwise (tests).
+final secretStoreProvider = Provider<SecretStore>((ref) => SecretStore.memory());
+
+/// Bound to the Hive-backed store in `main`; in-memory otherwise (tests).
+final settingsRepositoryProvider =
+    Provider<SettingsRepository>((ref) => SettingsRepository.memory());
 
 /// Current theme mode, persisted in the settings box.
 class ThemeModeNotifier extends Notifier<ThemeMode> {
@@ -31,3 +34,36 @@ class ThemeModeNotifier extends Notifier<ThemeMode> {
 
 final themeModeProvider =
     NotifierProvider<ThemeModeNotifier, ThemeMode>(ThemeModeNotifier.new);
+
+/// Interface language, persisted in the settings box (English by default).
+class LanguageNotifier extends Notifier<AppLanguage> {
+  SettingsRepository get _settings => ref.read(settingsRepositoryProvider);
+
+  @override
+  AppLanguage build() =>
+      AppLanguage.fromCode(_settings.getString(SettingsRepository.kLanguage));
+
+  Future<void> set(AppLanguage language) async {
+    state = language;
+    await _settings.setString(SettingsRepository.kLanguage, language.name);
+  }
+}
+
+final languageProvider =
+    NotifierProvider<LanguageNotifier, AppLanguage>(LanguageNotifier.new);
+
+/// Whether the first-run tour has been seen (or skipped).
+class OnboardedNotifier extends Notifier<bool> {
+  SettingsRepository get _settings => ref.read(settingsRepositoryProvider);
+
+  @override
+  bool build() => _settings.getString(SettingsRepository.kOnboarded) == 'yes';
+
+  Future<void> finish() async {
+    state = true;
+    await _settings.setString(SettingsRepository.kOnboarded, 'yes');
+  }
+}
+
+final onboardedProvider =
+    NotifierProvider<OnboardedNotifier, bool>(OnboardedNotifier.new);

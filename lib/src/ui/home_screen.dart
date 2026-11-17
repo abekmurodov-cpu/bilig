@@ -1,100 +1,125 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../l10n/app_strings.dart';
 import '../providers/knowledge_providers.dart';
-import 'capture_screen.dart';
-import 'review_screen.dart';
+import '../providers/study_providers.dart';
+import '../models/knowledge_item.dart';
+import '../practice/practice_models.dart';
+import '../providers/navigation.dart';
+import 'widgets/app_logo.dart';
+import 'stats_screen.dart';
+import 'widgets/forest_view.dart';
 import 'widgets/item_tile.dart';
+import 'widgets/note_detail_sheet.dart';
+import 'widgets/study_cards.dart';
+import 'theme.dart';
+
+/// How many notes each Home section lists.
+const int _sectionSize = 5;
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final strings = context.s;
     final itemsAsync = ref.watch(knowledgeListProvider);
-    final dueCount = ref.watch(dueItemsProvider).length;
+    final items = itemsAsync.asData?.value ?? const [];
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Knowledge'),
+        title: const Row(
+          children: [
+            AppLogo(size: 34),
+            SizedBox(width: 10),
+            Text('Bilig'),
+          ],
+        ),
+        actions: [
+          const _StreakButton(),
+          if (items.isNotEmpty)
+            IconButton(
+              tooltip: strings.examMode,
+              icon: const Icon(Icons.event_outlined),
+              onPressed: () => showExamDialog(context, ref),
+            ),
+          const SizedBox(width: 4),
+        ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openCapture(context),
-        icon: const Icon(Icons.add),
-        label: const Text('Capture'),
-      ),
-      body: itemsAsync.when(
+      body: ReadableWidth(maxWidth: 860, child: itemsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Something went wrong:\n$e')),
+        error: (e, _) => Center(child: Text(strings.somethingWentWrong(e))),
         data: (items) {
           if (items.isEmpty) {
             return const _EmptyState();
           }
-          return Column(
+          final recent = ref.watch(notesSortedProvider).take(_sectionSize).toList();
+          final weak = [for (final n in items) if (n.isWeak) n]
+            ..sort((a, b) => b.lapses != a.lapses
+                ? b.lapses - a.lapses
+                : a.dueDate.compareTo(b.dueDate));
+          void seeAll() => ref.read(shellTabProvider.notifier).go(ShellTab.notes);
+          return ListView(
+            padding: const EdgeInsets.only(bottom: 24),
             children: [
-              if (dueCount > 0)
-                _ReviewBanner(
-                  count: dueCount,
-                  onStart: () => _openReview(context),
+              const TodayCard(),
+              const ExamCards(),
+              const ForestView(),
+              if (weak.isNotEmpty) ...[
+                _SectionHeader(
+                  icon: Icons.trending_down,
+                  title: strings.strugglingWith,
+                  action: strings.practiseThese,
+                  onAction: () => startSession(context, weak.take(20).toList(),
+                      scope: PracticeScope.weakPoints),
                 ),
-              Expanded(
-                child: ListView.separated(
-                  padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
-                  itemCount: items.length,
-                  separatorBuilder: (_, _) => const SizedBox(height: 4),
-                  itemBuilder: (context, i) => ItemTile(item: items[i]),
-                ),
+                for (final n in weak.take(_sectionSize)) _tile(context, n),
+              ],
+              _SectionHeader(
+                icon: Icons.schedule,
+                title: strings.recentlyAdded,
+                action: strings.seeAll,
+                onAction: seeAll,
               ),
+              for (final n in recent) _tile(context, n),
             ],
           );
         },
-      ),
+      )),
     );
   }
 
-  void _openCapture(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const CaptureScreen()),
-    );
-  }
-
-  void _openReview(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const ReviewScreen()),
-    );
-  }
+  Widget _tile(BuildContext context, KnowledgeItem n) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+        child: ItemTile(item: n, onTap: () => showNoteDetailSheet(context, n)),
+      );
 }
 
-class _ReviewBanner extends StatelessWidget {
-  const _ReviewBanner({required this.count, required this.onStart});
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.icon,
+    required this.title,
+    required this.action,
+    required this.onAction,
+  });
 
-  final int count;
-  final VoidCallback onStart;
+  final IconData icon;
+  final String title;
+  final String action;
+  final VoidCallback onAction;
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: scheme.primaryContainer,
-        borderRadius: BorderRadius.circular(16),
-      ),
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 18, 8, 8),
       child: Row(
         children: [
-          Icon(Icons.bolt, color: scheme.onPrimaryContainer),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              '$count ${count == 1 ? 'item' : 'items'} ready to challenge you',
-              style: TextStyle(
-                color: scheme.onPrimaryContainer,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          FilledButton(onPressed: onStart, child: const Text('Review')),
+          Icon(icon, size: 20, color: theme.colorScheme.primary),
+          const SizedBox(width: 8),
+          Expanded(child: Text(title, style: theme.textTheme.titleMedium)),
+          TextButton(onPressed: onAction, child: Text(action)),
         ],
       ),
     );
@@ -112,22 +137,47 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.psychology_outlined,
-                size: 72, color: Theme.of(context).colorScheme.primary),
+            const AppLogo(size: 96),
             const SizedBox(height: 16),
             Text(
-              'Your notes will hit back.',
+              context.s.emptyTitle,
               style: Theme.of(context).textTheme.titleLarge,
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Capture a fact, a concept, a command, or a question. '
-              'The app will quiz you on it later so you never forget.',
+            Text(
+              context.s.emptyBody,
               textAlign: TextAlign.center,
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// "🔥 7" when on a streak (a chart icon otherwise); opens Progress.
+class _StreakButton extends ConsumerWidget {
+  const _StreakButton();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final streak = currentStreak(ref.watch(activityProvider));
+    void open() => Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const StatsScreen()));
+    if (streak == 0) {
+      return IconButton(
+        tooltip: context.s.progress,
+        icon: const Icon(Icons.insights_outlined),
+        onPressed: open,
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: ActionChip(
+        tooltip: context.s.progress,
+        label: Text('🔥 $streak'),
+        onPressed: open,
       ),
     );
   }
