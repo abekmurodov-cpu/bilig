@@ -7,6 +7,8 @@ name: Release
 on:
   push:
     tags: ['v*']
+    # Test builds without publishing: push to a branch named ci/<anything>.
+    branches: ['ci/**']
   workflow_dispatch:
 
 permissions:
@@ -19,13 +21,22 @@ jobs:
   windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
           cache: true
-      - run: flutter build windows --release
+      - name: Build
+        shell: pwsh
+        run: |
+          flutter build windows --release 2>&1 | Tee-Object -FilePath build.log
+          if ($LASTEXITCODE -ne 0) {
+            # The end of the log as an annotation, readable without signing in.
+            $tail = (Get-Content build.log -Tail 80) -join '%0A'
+            Write-Output "::error title=flutter build windows::$tail"
+            exit 1
+          }
       - name: Installer and zip
         shell: pwsh
         run: |
@@ -42,7 +53,7 @@ jobs:
   linux:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: System libraries
         run: |
           sudo apt-get update
@@ -93,7 +104,7 @@ jobs:
   macos:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -118,7 +129,7 @@ jobs:
     env:
       KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         if: env.KEYSTORE != ''
       - uses: actions/setup-java@v4
         if: env.KEYSTORE != ''
@@ -155,6 +166,7 @@ jobs:
 
   publish:
     needs: [windows, linux, macos, android]
+    if: github.ref_type == 'tag' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
