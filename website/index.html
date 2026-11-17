@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bilig — notes that quiz you back</title>
+  <meta name="description" content="Write down what you learn. Bilig turns your notes into questions and asks them right before you'd forget. For Windows, Mac, Linux, Android and iPhone.">
+  <meta property="og:title" content="Bilig — notes that quiz you back">
+  <meta property="og:description" content="Write down what you learn. Bilig turns it into practice and reminds you before you forget.">
+  <meta property="og:image" content="assets/shots/desktop-home.webp">
+  <meta name="theme-color" content="#535B95">
+  <link rel="icon" href="assets/favicon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="nav">
+  <a class="brand" href="#top"><img src="assets/icon.png" alt="" width="36" height="36"><span>Bilig</span></a>
+  <nav class="links">
+    <a href="#how" data-i18n="nav.how">How it works</a>
+    <a href="#features" data-i18n="nav.features">Features</a>
+    <a href="#faq" data-i18n="nav.faq">Questions</a>
+  </nav>
+  <div class="lang" role="group" aria-label="Language">
+    <button data-lang="en">EN</button><button data-lang="uz">UZ</button><button data-lang="ru">RU</button>
+  </div>
+  <a class="btn btn-small" href="#download" data-i18n="nav.download">Download</a>
+</header>
+
+<main id="top">
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="hero-text">
+      <p class="eyebrow" data-i18n="hero.eyebrow">Free · Windows · Mac · Linux · Android</p>
+      <h1 data-i18n-html="hero.title">Notes that <em>quiz you</em> back.</h1>
+      <p class="lead" data-i18n="hero.lead">Write down what you learn. Bilig turns each note into questions and asks them right before you'd forget — so what you study actually stays.</p>
+      <div class="cta">
+        <a class="btn" id="hero-download" href="#download"><span class="os-icon" id="hero-os-icon"></span><span id="hero-download-label" data-i18n="hero.download">Download</span></a>
+        <a class="btn btn-ghost" href="#download" data-i18n="hero.all">All platforms</a>
+      </div>
+      <p class="fine" id="hero-fine" data-i18n="hero.fine">No account needed. Your notes stay on your device.</p>
+    </div>
+    <div class="hero-art">
+      <div class="laptop">
+        <div class="screen"><img src="assets/shots/desktop-home.webp" alt="Bilig on a laptop: today's reviews, knowledge trees and notes you struggle with" width="1600" height="1025"></div>
+        <div class="base"></div>
+      </div>
+      <div class="phone phone-hero"><img src="assets/shots/blank.webp" alt="A fill-in-the-blank question" width="618" height="640"></div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="how" id="how">
+    <h2 data-i18n="how.title">Three steps. Then it just works.</h2>
+    <ol class="steps">
+      <li>
+        <span class="num">1</span>
+        <h3 data-i18n="how.1.t">Write it down</h3>
+        <p data-i18n="how.1.p">Type it, say it, snap a photo of a page, or paste a whole lecture and let it split into notes.</p>
+      </li>
+      <li>
+        <span class="num">2</span>
+        <h3 data-i18n="how.2.t">Bilig asks you</h3>
+        <p data-i18n="how.2.p">Flashcards, multiple choice, fill-in-the-blank, typed answers — made from your own words.</p>
+      </li>
+      <li>
+        <span class="num">3</span>
+        <h3 data-i18n="how.3.t">It sticks</h3>
+        <p data-i18n="how.3.p">Each note comes back just before you'd forget it. Five minutes a day keeps everything fresh.</p>
+      </li>
+    </ol>
+  </section>
+
+  <!-- Features -->
+  <section class="features" id="features">
+    <h2 data-i18n="feat.title">Built for people who actually want to remember.</h2>
+
+    <article class="feature">
+      <div class="feature-text">
+        <p class="tag" data-i18n="feat.trees.tag">Progress you can see</p>
+        <h3 data-i18n="feat.trees.t">Every subject grows into a tree.</h3>
+        <p data-i18n="feat.trees.p">Each category is a tree and each note a leaf. Leaves turn green as you learn them and yellow when they need a review — one look tells you where you stand.</p>
+      </div>
+      <div class="phone"><img src="assets/shots/tree.webp" alt="A knowledge tree" loading="lazy" width="618" height="1300"></div>
+    </article>
+
+    <article class="feature reverse">
+      <div class="feature-text">
+        <p class="tag" data-i18n="feat.paper.tag">Note paper</p>
+        <h3 data-i18n="feat.paper.t">A whole topic on one beautiful page.</h3>
+        <p data-i18n="feat.paper.p">Before an exam, open a category as a page: contents, numbered sections, your highlights and formulas, set like a book. Export it as Markdown in one tap.</p>
+      </div>
+      <div class="phone paper-phone"><img src="assets/shots/paper.webp" alt="A category shown as one page" loading="lazy" width="618" height="1520"></div>
+    </article>
+
+    <div class="grid">
+      <div class="card">
+        <div class="card-icon">✦</div>
+        <h3 data-i18n="feat.ai.t">Smart questions</h3>
+        <p data-i18n="feat.ai.p">AI writes real questions from your notes — and Bilig still works fully without it.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon serif">∑</div>
+        <h3 data-i18n="feat.fmt.t">Formulas &amp; code</h3>
+        <p data-i18n="feat.fmt.p">Bold, lists, code blocks with colours, and LaTeX formulas like x² + y² = z².</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">◐</div>
+        <h3 data-i18n="feat.dark.t">Light and dark</h3>
+        <p data-i18n="feat.dark.p">Easy on the eyes at midnight before the exam, too.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">⇄</div>
+        <h3 data-i18n="feat.import.t">Bring your notes</h3>
+        <p data-i18n="feat.import.p">Import Anki decks, Markdown and text files — or drop them onto the window.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">Aa</div>
+        <h3 data-i18n="feat.lang.t">Three languages</h3>
+        <p data-i18n="feat.lang.p">O‘zbekcha, Русский and English — the app and its questions.</p>
+      </div>
+      <div class="card">
+        <div class="card-icon">⌂</div>
+        <h3 data-i18n="feat.private.t">Yours, offline</h3>
+        <p data-i18n="feat.private.p">Notes live on your device and work without internet. Back them up whenever you like.</p>
+      </div>
+    </div>
+
+    <div class="wide-shot">
+      <img src="assets/shots/desktop-notes.webp" alt="Notes and an open note side by side on a wide screen" loading="lazy" width="1600" height="1025">
+      <p data-i18n="feat.wide">On a laptop, notes and the open note sit side by side. ⌘N / Ctrl+N for a new note, ⌘F to search.</p>
+    </div>
+  </section>
+
+  <!-- Download -->
+  <section class="download" id="download">
+    <h2 data-i18n="dl.title">Download Bilig</h2>
+    <p class="lead center" data-i18n="dl.lead">Free. Pick your device.</p>
+
+    <div class="platforms">
+      <div class="platform" data-os="windows">
+        <div class="p-icon"><svg viewBox="0 0 24 24"><path d="M3 5.5 10.5 4.5v7H3zM11.5 4.3 21 3v8.5h-9.5zM3 12.5h7.5v7L3 18.5zM11.5 12.5H21V21l-9.5-1.3z"/></svg></div>
+        <h3>Windows</h3>
+        <p class="req">Windows 10 / 11 · 64-bit</p>
+        <a class="btn" data-file="Bilig-Windows-Setup.exe" data-i18n="dl.install">Installer (.exe)</a>
+        <a class="alt" data-file="Bilig-Windows.zip" data-i18n="dl.zip">Portable .zip</a>
+      </div>
+      <div class="platform" data-os="mac">
+        <div class="p-icon"><svg viewBox="0 0 24 24"><path d="M16.4 12.6c0-2.4 2-3.5 2-3.6-1.1-1.6-2.8-1.8-3.4-1.8-1.4-.2-2.8.8-3.5.8s-1.8-.8-3-.8C6.9 7.3 5.4 8.2 4.6 9.7c-1.7 2.9-.4 7.2 1.2 9.6.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.1-.8s1.9.8 3.1.8c1.3 0 2.1-1.2 2.9-2.4.9-1.3 1.3-2.6 1.3-2.7 0 0-2.7-1-2.8-4zM14.1 5.5c.6-.8 1.1-1.9 1-3-1 0-2.1.6-2.8 1.4-.6.7-1.1 1.8-1 2.9 1 .1 2.1-.5 2.8-1.3z"/></svg></div>
+        <h3>macOS</h3>
+        <p class="req">macOS 10.15+ · Apple silicon &amp; Intel</p>
+        <a class="btn" data-file="Bilig-macOS.dmg" data-i18n="dl.dmg">Download (.dmg)</a>
+      </div>
+      <div class="platform" data-os="linux">
+        <div class="p-icon"><svg viewBox="0 0 24 24"><path d="M12 2c-2.2 0-3.4 1.9-3.4 4.4 0 1.5.2 2.5-.6 3.8C6.8 12 5 14 5 16.6c0 .6.1 1.1.3 1.6-.6.3-1.3.6-1.3 1.3 0 .9 1.5 1 2.6 1.4 1 .4 1.6 1.1 2.6 1.1.8 0 1.3-.5 1.6-.9h2.4c.3.4.8.9 1.6.9 1 0 1.6-.7 2.6-1.1 1.1-.4 2.6-.5 2.6-1.4 0-.7-.7-1-1.3-1.3.2-.5.3-1 .3-1.6 0-2.6-1.8-4.6-3-6.4-.8-1.3-.6-2.3-.6-3.8C15.4 3.9 14.2 2 12 2zm-1.4 3.6c.4 0 .7.5.7 1.1s-.3 1-.7 1-.7-.4-.7-1 .3-1.1.7-1.1zm2.8 0c.4 0 .7.5.7 1.1s-.3 1-.7 1-.7-.4-.7-1 .3-1.1.7-1.1zM12 8.3c.8 0 1.8.5 1.8.9s-1 1.1-1.8 1.1-1.8-.7-1.8-1.1.9-.9 1.8-.9z"/></svg></div>
+        <h3>Linux</h3>
+        <p class="req">Ubuntu, Debian, Mint · x64</p>
+        <a class="btn" data-file="Bilig-Linux-amd64.deb" data-i18n="dl.deb">Debian, Ubuntu (.deb)</a>
+        <a class="alt" data-file="Bilig-Linux-x64.tar.gz" data-i18n="dl.tar">Any distro (.tar.gz)</a>
+      </div>
+      <div class="platform" data-os="android">
+        <div class="p-icon"><svg viewBox="0 0 24 24"><path d="M17.5 9.4 19.2 6.5a.4.4 0 0 0-.7-.4l-1.7 3A10.4 10.4 0 0 0 12 8a10.4 10.4 0 0 0-4.8 1.1l-1.7-3a.4.4 0 0 0-.7.4l1.7 2.9A9.6 9.6 0 0 0 2 17h20a9.6 9.6 0 0 0-4.5-7.6zM7 14.3a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm10 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg></div>
+        <h3>Android</h3>
+        <p class="req">Android 7+</p>
+        <a class="btn" data-file="Bilig-Android.apk" data-i18n="dl.apk">Download (.apk)</a>
+        <span class="alt muted" data-i18n="dl.play">Google Play — soon</span>
+      </div>
+      <div class="platform" data-os="ios">
+        <div class="p-icon"><svg viewBox="0 0 24 24"><rect x="6" y="2" width="12" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10.5 18.5h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></div>
+        <h3>iPhone &amp; iPad</h3>
+        <p class="req">iOS 15+</p>
+        <span class="btn btn-disabled" data-i18n="dl.appstore">App Store — soon</span>
+      </div>
+    </div>
+
+    <details class="first-run">
+      <summary data-i18n="dl.help.t">First time opening it? Your computer may ask once.</summary>
+      <ul>
+        <li data-i18n-html="dl.help.win"><b>Windows:</b> if SmartScreen says “Windows protected your PC”, click <i>More info → Run anyway</i>.</li>
+        <li data-i18n-html="dl.help.mac"><b>Mac:</b> drag Bilig to Applications. The first time, right-click it and choose <i>Open</i>, then <i>Open</i> again.</li>
+        <li data-i18n-html="dl.help.linux"><b>Linux:</b> <code>sudo apt install ./Bilig-Linux-amd64.deb</code>, then find Bilig in your apps.</li>
+        <li data-i18n-html="dl.help.android"><b>Android:</b> open the file and allow installing from your browser when asked.</li>
+      </ul>
+    </details>
+    <p class="fine center"><a id="all-releases" data-i18n="dl.older">All versions and release notes</a></p>
+  </section>
+
+  <!-- FAQ -->
+  <section class="faq" id="faq">
+    <h2 data-i18n="faq.title">Questions</h2>
+    <details><summary data-i18n="faq.1.q">Is Bilig free?</summary><p data-i18n="faq.1.a">Yes. Everything you see here is free to use.</p></details>
+    <details><summary data-i18n="faq.2.q">Do I need an account or internet?</summary><p data-i18n="faq.2.a">No. Bilig works offline and keeps your notes on your device. The internet is only used for the optional AI features.</p></details>
+    <details><summary data-i18n="faq.3.q">How does the AI part work?</summary><p data-i18n="faq.3.a">AI can write questions, read photos of pages and split long texts into notes. Today it uses a free key from Google Gemini or Groq that you paste in Settings once; without it, Bilig makes questions itself.</p></details>
+    <details><summary data-i18n="faq.4.q">Can I move my notes between devices?</summary><p data-i18n="faq.4.a">Save a backup file on one device and open it on another. Bilig can also import Anki decks and Markdown files.</p></details>
+    <details><summary data-i18n="faq.5.q">What is spaced repetition?</summary><p data-i18n="faq.5.a">A study method backed by decades of research: you review each fact just as you're about to forget it, so the gaps between reviews grow and it moves into long-term memory.</p></details>
+  </section>
+
+  <section class="final">
+    <img src="assets/icon.png" alt="" width="88" height="88">
+    <h2 data-i18n="final.t">Remember what you learn.</h2>
+    <a class="btn" href="#download" data-i18n="final.b">Get Bilig — it's free</a>
+  </section>
+</main>
+
+<footer>
+  <span>© 2026 Bilig</span>
+  <span class="footer-links"><a href="privacy.html" data-i18n="footer.privacy">Privacy</a><a id="footer-github" data-i18n="footer.source">Source on GitHub</a></span>
+</footer>
+
+<script src="main.js"></script>
+</body>
+</html>
