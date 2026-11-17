@@ -1,13 +1,14 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:flutter_timezone/flutter_timezone.dart';
 import 'package:timezone/data/latest_all.dart' as tzdata;
 import 'package:timezone/timezone.dart' as tz;
 
-/// Reminders are scheduled in this zone (Uzbekistan, UTC+5).
-const String _timeZone = 'Asia/Tashkent';
+/// Reminders are scheduled in the device's zone; this one if it can't be read.
+const String _fallbackTimeZone = 'Asia/Tashkent';
 
-/// Schedules local "time to review" reminders on Android and macOS — a safe
-/// no-op on web (the plugin has no web implementation).
+/// Schedules local "time to review" reminders on Android, iOS, macOS and
+/// Windows — a safe no-op on web and Linux, which can't schedule them.
 class NotificationService {
   NotificationService([FlutterLocalNotificationsPlugin? plugin])
       : _plugin = plugin ?? FlutterLocalNotificationsPlugin();
@@ -24,34 +25,61 @@ class NotificationService {
       importance: Importance.defaultImportance,
       priority: Priority.defaultPriority,
     ),
+    iOS: DarwinNotificationDetails(),
     macOS: DarwinNotificationDetails(),
+    windows: WindowsNotificationDetails(),
   );
+
+  /// Whether this platform can schedule reminders.
+  static bool get supported =>
+      !kIsWeb && defaultTargetPlatform != TargetPlatform.linux;
 
   /// Initializes the plugin and the timezone database. Call once at startup.
   Future<void> init() async {
-    if (kIsWeb) return;
+    if (!supported) return;
     tzdata.initializeTimeZones();
-    tz.setLocalLocation(tz.getLocation(_timeZone));
+    try {
+      tz.setLocalLocation(tz.getLocation(await FlutterTimezone.getLocalTimezone()));
+    } catch (_) {
+      tz.setLocalLocation(tz.getLocation(_fallbackTimeZone));
+    }
+    const darwin = DarwinInitializationSettings(
+      requestAlertPermission: false,
+      requestBadgePermission: false,
+      requestSoundPermission: false,
+    );
     const settings = InitializationSettings(
       android: AndroidInitializationSettings('@mipmap/ic_launcher'),
-      macOS: DarwinInitializationSettings(
-        requestAlertPermission: false,
-        requestBadgePermission: false,
-        requestSoundPermission: false,
+      iOS: darwin,
+      macOS: darwin,
+      windows: WindowsInitializationSettings(
+        appName: 'Bilig',
+        appUserModelId: 'Bilig.Bilig.Notes',
+        guid: '6f1c3b0e-5d2a-4f7e-9b1c-8a4e2d7f3c51',
       ),
     );
-    await _plugin.initialize(settings);
-    _ready = true;
+    try {
+      await _plugin.initialize(settings);
+      _ready = true;
+    } catch (_) {
+      // Reminders are a nicety; the app works without them.
+    }
   }
 
-  /// Requests notification permission (Android 13+, macOS). Returns true if
-  /// granted (or if the platform doesn't gate it).
+  /// Requests notification permission (Android 13+, iOS, macOS). Returns
+  /// true if granted (or if the platform doesn't gate it).
   Future<bool> requestPermission() async {
     if (kIsWeb || !_ready) return false;
     final android = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
     if (android != null) {
       return await android.requestNotificationsPermission() ?? true;
+    }
+    final ios = _plugin.resolvePlatformSpecificImplementation<
+        IOSFlutterLocalNotificationsPlugin>();
+    if (ios != null) {
+      return await ios.requestPermissions(alert: true, badge: true, sound: true) ??
+          true;
     }
     final macos = _plugin.resolvePlatformSpecificImplementation<
         MacOSFlutterLocalNotificationsPlugin>();
@@ -60,7 +88,7 @@ class NotificationService {
               alert: true, badge: true, sound: true) ??
           true;
     }
-    return false;
+    return true; // Windows doesn't ask.
   }
 
   /// (Re)schedules a daily reminder at [hour]:[minute]. Prefers exact alarms so

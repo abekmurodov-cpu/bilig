@@ -1,17 +1,19 @@
-# knowledge
+# Bilig
 
-A new Flutter project.
+**Notes that quiz you back.** Write down what you learn; Bilig turns each note
+into questions (flashcards, multiple choice, fill-in-the-blank, typed answers)
+and brings it back right before you'd forget it, using spaced repetition.
 
-## Getting Started
+Runs on Android, iPhone/iPad, macOS, Windows and Linux. Built with Flutter.
+The app speaks O‘zbekcha, Русский and English.
 
-This project is a starting point for a Flutter application.
+- Website and downloads: <https://abekmurodov-cpu.github.io/tom_riddle/>
+- Releasing and app stores: [packaging/README.md](packaging/README.md)
 
-A few resources to get you started if this is your first Flutter project:
+## Develop
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
-
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```sh
+flutter pub get
+flutter test
+flutter run -d macos   # or: ios, android, windows, linux
+```

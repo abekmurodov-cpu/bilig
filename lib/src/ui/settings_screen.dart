@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -11,6 +10,7 @@ import '../llm/llm_provider.dart';
 import '../llm/llm_providers.dart';
 import '../llm/quiz_prep.dart';
 import '../notifications/notification_providers.dart';
+import '../notifications/notification_service.dart';
 import '../providers/knowledge_providers.dart';
 import '../providers/settings_providers.dart';
 import '../sync/sync_providers.dart';
@@ -26,13 +26,13 @@ class SettingsScreen extends ConsumerWidget {
       appBar: AppBar(title: Text(context.s.navSettings)),
       body: ReadableWidth(child: ListView(
         padding: const EdgeInsets.fromLTRB(0, 4, 0, 24),
-        children: const [
-          _ThemeSection(),
-          _LanguageSection(),
-          if (!kIsWeb) _RemindersSection(),
-          _LlmSection(),
-          DataSection(),
-          _TelegramSection(),
+        children: [
+          const _ThemeSection(),
+          const _LanguageSection(),
+          if (NotificationService.supported) const _RemindersSection(),
+          const _LlmSection(),
+          const DataSection(),
+          const _TelegramSection(),
         ],
       )),
     );
