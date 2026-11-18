@@ -63,6 +63,7 @@ class BiligApp extends ConsumerWidget {
         GlobalCupertinoLocalizations.delegate,
       ],
       themeMode: themeMode,
+      scrollBehavior: const IosScrollBehavior(),
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),
       home: ref.watch(onboardedProvider)

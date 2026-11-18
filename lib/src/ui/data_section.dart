@@ -15,6 +15,7 @@ import '../providers/knowledge_providers.dart';
 import 'bulk_add_screen.dart';
 import 'settings_screen.dart';
 import 'widgets/file_io.dart';
+import 'widgets/ios.dart';
 
 /// Settings → "Your notes": back up and restore, import from Anki or
 /// Quizlet, and remove the sample notes.
@@ -125,7 +126,6 @@ class _DataSectionState extends ConsumerState<DataSection> {
         (n) => n.tags.any((t) => sampleTags.contains(t.toLowerCase())));
     return SettingsSection(
       title: strings.yourNotes,
-      icon: Icons.inventory_2_outlined,
       child: Column(
         children: [
           if (_busy) const LinearProgressIndicator(),
@@ -215,22 +215,13 @@ Future<void> openNotesFile(
     }
     final file = BiligFile.decode(bytes);
     if (file.kind == BiligFileKind.share && context.mounted) {
-      final ok = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text(strings.addSharedTitle(file.title ?? name)),
-          content: Text(strings.addSharedBody(file.notes.length)),
-          actions: [
-            TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: Text(strings.cancel)),
-            FilledButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: Text(strings.addNotes)),
-          ],
-        ),
+      final ok = await showIosConfirm(
+        context,
+        title: strings.addSharedTitle(file.title ?? name),
+        message: strings.addSharedBody(file.notes.length),
+        confirm: strings.addNotes,
       );
-      if (ok != true) return;
+      if (!ok) return;
     }
     final result = await ref.read(knowledgeListProvider.notifier).importFile(file);
     messenger.showSnackBar(

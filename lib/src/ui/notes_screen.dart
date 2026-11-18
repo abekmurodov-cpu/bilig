@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -6,9 +7,11 @@ import '../models/knowledge_item.dart';
 import '../models/note_search.dart';
 import '../providers/knowledge_providers.dart';
 import '../providers/navigation.dart';
+import 'theme.dart';
 import 'widgets/category_field.dart';
 import 'widgets/category_tree.dart';
 import 'widgets/item_tile.dart';
+import 'widgets/ios.dart';
 import 'widgets/note_detail_sheet.dart';
 import 'widgets/undo_delete.dart';
 
@@ -87,21 +90,13 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
 
   Future<void> _deleteSelected() async {
     final strings = context.s;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(strings.deleteNotes(_selected.length)),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(strings.cancel)),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(strings.delete),
-          ),
-        ],
-      ),
+    final ok = await showIosConfirm(
+      context,
+      title: strings.deleteNotes(_selected.length),
+      confirm: strings.delete,
+      destructive: true,
     );
-    if (ok != true || !mounted) return;
+    if (!ok || !mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     final store = ref.read(knowledgeListProvider.notifier);
     final deleted = await store.deleteMany({..._selected});
@@ -199,7 +194,8 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
                 const SizedBox(width: 4),
               ],
             )
-          : AppBar(
+          : largeTitleBar(
+        context,
         title: Text(strings.navNotes),
         actions: [
           IconButton(
@@ -346,7 +342,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
         if (i >= count) {
           return const Padding(
             padding: EdgeInsets.all(16),
-            child: Center(child: CircularProgressIndicator()),
+            child: Center(child: CupertinoActivityIndicator()),
           );
         }
         final item = notes[i];

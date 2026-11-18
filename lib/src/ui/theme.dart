@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
 /// Bilig's indigo.
@@ -34,8 +35,18 @@ ThemeData buildTheme(Brightness brightness) {
       titleLarge: text.titleLarge?.copyWith(fontWeight: FontWeight.w600),
       titleMedium: text.titleMedium?.copyWith(fontWeight: FontWeight.w600),
     ),
+    // iOS everywhere: pages slide in from the right and swipe back, the back
+    // button is a chevron.
+    pageTransitionsTheme: PageTransitionsTheme(builders: {
+      for (final platform in TargetPlatform.values)
+        platform: const CupertinoPageTransitionsBuilder(),
+    }),
+    actionIconTheme: ActionIconThemeData(
+      backButtonIconBuilder: (_) => const Icon(CupertinoIcons.back, size: 28),
+    ),
+    // Pushed screens get a small centred title; tabs use [largeTitleBar].
     appBarTheme: AppBarTheme(
-      centerTitle: false,
+      centerTitle: true,
       backgroundColor: dark ? scheme.surface : scheme.surfaceContainerLowest,
       surfaceTintColor: Colors.transparent,
       scrolledUnderElevation: 0.5,
@@ -43,10 +54,10 @@ ThemeData buildTheme(Brightness brightness) {
       // styles set outside textTheme spell out their size.
       titleTextStyle: TextStyle(
           fontFamily: appFont,
-          fontSize: 24,
-          fontWeight: FontWeight.w700,
+          fontSize: 17,
+          fontWeight: FontWeight.w600,
           color: scheme.onSurface,
-          letterSpacing: -0.3),
+          letterSpacing: -0.2),
     ),
     cardTheme: CardThemeData(
       elevation: 0,
@@ -127,7 +138,7 @@ ThemeData buildTheme(Brightness brightness) {
           borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
     ),
     dialogTheme: DialogThemeData(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
     ),
     snackBarTheme: SnackBarThemeData(
       behavior: SnackBarBehavior.floating,
@@ -139,6 +150,40 @@ ThemeData buildTheme(Brightness brightness) {
       borderRadius: BorderRadius.circular(3),
     ),
   );
+}
+
+/// The top bar of a tab: an iOS large title on the left.
+AppBar largeTitleBar(
+  BuildContext context, {
+  required Widget title,
+  List<Widget>? actions,
+  PreferredSizeWidget? bottom,
+}) =>
+    AppBar(
+      centerTitle: false,
+      toolbarHeight: 64,
+      titleTextStyle: TextStyle(
+          fontFamily: appFont,
+          fontSize: 32,
+          fontWeight: FontWeight.w700,
+          color: Theme.of(context).colorScheme.onSurface,
+          letterSpacing: -0.6),
+      title: title,
+      actions: actions,
+      bottom: bottom,
+    );
+
+/// iOS scrolling everywhere: lists bounce at the ends instead of glowing.
+class IosScrollBehavior extends MaterialScrollBehavior {
+  const IosScrollBehavior();
+
+  @override
+  ScrollPhysics getScrollPhysics(BuildContext context) => const BouncingScrollPhysics();
+
+  @override
+  Widget buildOverscrollIndicator(
+          BuildContext context, Widget child, ScrollableDetails details) =>
+      child;
 }
 
 /// The card a practice question sits on: lifted a little off the page.

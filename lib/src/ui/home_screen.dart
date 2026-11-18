@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -28,7 +29,8 @@ class HomeScreen extends ConsumerWidget {
     final items = itemsAsync.asData?.value ?? const [];
 
     return Scaffold(
-      appBar: AppBar(
+      appBar: largeTitleBar(
+        context,
         title: const Row(
           children: [
             AppLogo(size: 34),
@@ -48,7 +50,7 @@ class HomeScreen extends ConsumerWidget {
         ],
       ),
       body: ReadableWidth(maxWidth: 860, child: itemsAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
+        loading: () => const Center(child: CupertinoActivityIndicator()),
         error: (e, _) => Center(child: Text(strings.somethingWentWrong(e))),
         data: (items) {
           if (items.isEmpty) {

@@ -10,6 +10,7 @@ import '../../providers/navigation.dart';
 import '../capture_screen.dart';
 import '../note_paper_screen.dart';
 import 'category_tree.dart';
+import 'ios.dart';
 import 'note_detail_sheet.dart';
 import 'share_category.dart';
 import 'study_cards.dart';
@@ -55,27 +56,13 @@ class _CategorySheet extends ConsumerWidget {
 
   Future<void> _rename(BuildContext context, WidgetRef ref, {String? topic}) async {
     final strings = context.s;
-    final controller = TextEditingController(text: topic ?? category);
-    final name = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(topic == null ? strings.renameCategory : strings.renameTopic),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: InputDecoration(
-              helperText: topic == null ? null : strings.emptyRemovesTopic),
-          onSubmitted: (v) => Navigator.pop(context, v),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: Text(strings.cancel)),
-          FilledButton(
-              onPressed: () => Navigator.pop(context, controller.text),
-              child: Text(strings.save)),
-        ],
-      ),
+    final name = await showIosPrompt(
+      context,
+      title: topic == null ? strings.renameCategory : strings.renameTopic,
+      message: topic == null ? null : strings.emptyRemovesTopic,
+      initial: topic ?? category,
+      confirm: strings.save,
     );
-    controller.dispose();
     if (name == null) return;
     await ref.read(knowledgeListProvider.notifier).rename(category, name, topic: topic);
     if (topic == null && context.mounted && name.trim().isNotEmpty) Navigator.pop(context);

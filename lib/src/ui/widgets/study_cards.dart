@@ -7,6 +7,7 @@ import '../../practice/practice_models.dart';
 import '../../providers/knowledge_providers.dart';
 import '../../providers/study_providers.dart';
 import '../practice/practice_session_screen.dart';
+import 'ios.dart';
 
 /// Rough time per flashcard, for "about N min".
 const Duration _perCard = Duration(seconds: 20);
@@ -373,11 +374,11 @@ class _ExamDialogState extends ConsumerState<_ExamDialog> {
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: _date ?? now.add(const Duration(days: 14)),
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 730)),
+    final picked = await showIosDatePicker(
+      context,
+      initial: _date ?? now.add(const Duration(days: 14)),
+      first: now,
+      last: now.add(const Duration(days: 730)),
     );
     if (picked != null) setState(() => _date = picked);
   }

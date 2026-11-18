@@ -7,6 +7,7 @@ import '../../practice/practice_models.dart';
 import '../../providers/knowledge_providers.dart';
 import 'practice_session_screen.dart';
 import '../theme.dart';
+import '../widgets/ios.dart';
 
 /// Setup screen for a practice run: pick a method and a scope, then start.
 class PracticeScreen extends ConsumerStatefulWidget {
@@ -105,7 +106,7 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
         );
 
     return Scaffold(
-      appBar: AppBar(title: Text(strings.navPractice)),
+      appBar: largeTitleBar(context, title: Text(strings.navPractice)),
       body: ReadableWidth(maxWidth: 900, child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
         children: [
@@ -115,10 +116,10 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
             Padding(
               padding: const EdgeInsets.only(top: 10),
               child: Card(
-                child: SwitchListTile(
+                child: IosSwitchTile(
                   value: _reverse,
                   onChanged: (v) => setState(() => _reverse = v),
-                  secondary: const Icon(Icons.swap_horiz),
+                  leading: const Icon(Icons.swap_horiz),
                   title: Text(strings.reverseCards),
                   subtitle: Text(strings.reverseCardsBlurb),
                 ),

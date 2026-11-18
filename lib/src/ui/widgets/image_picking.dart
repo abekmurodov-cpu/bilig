@@ -1,7 +1,8 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../l10n/app_strings.dart';
+import 'ios.dart';
 
 /// Whether the platform has a camera worth offering (mobile only).
 bool get _isMobile =>
@@ -16,25 +17,12 @@ bool get _isMobile =>
 Future<Uint8List?> pickImageBytes(BuildContext context) async {
   ImageSource source = ImageSource.gallery;
   if (_isMobile) {
-    final picked = await showModalBottomSheet<ImageSource>(
-      context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.photo_camera),
-              title: Text(context.s.camera),
-              onTap: () => Navigator.of(ctx).pop(ImageSource.camera),
-            ),
-            ListTile(
-              leading: const Icon(Icons.photo_library),
-              title: Text(context.s.gallery),
-              onTap: () => Navigator.of(ctx).pop(ImageSource.gallery),
-            ),
-          ],
-        ),
-      ),
+    final picked = await showIosActionSheet<ImageSource>(
+      context,
+      options: [
+        (CupertinoIcons.camera, context.s.camera, ImageSource.camera),
+        (CupertinoIcons.photo_on_rectangle, context.s.gallery, ImageSource.gallery),
+      ],
     );
     if (picked == null) return null;
     source = picked;

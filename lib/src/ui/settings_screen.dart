@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -16,6 +17,7 @@ import '../providers/settings_providers.dart';
 import '../sync/sync_providers.dart';
 import '../sync/telegram_sync_service.dart';
 import 'theme.dart';
+import 'widgets/ios.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -23,7 +25,7 @@ class SettingsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      appBar: AppBar(title: Text(context.s.navSettings)),
+      appBar: largeTitleBar(context, title: Text(context.s.navSettings)),
       body: ReadableWidth(child: ListView(
         padding: const EdgeInsets.fromLTRB(0, 4, 0, 24),
         children: [
@@ -39,54 +41,42 @@ class SettingsScreen extends ConsumerWidget {
   }
 }
 
-/// A settings group: a rounded card headed by an icon and a title.
+/// A settings group in the iOS grouped style: a small grey caption above a
+/// rounded card.
 class SettingsSection extends StatelessWidget {
-  const SettingsSection({super.key, required this.title, required this.child, this.icon});
+  const SettingsSection({super.key, required this.title, required this.child});
 
   final String title;
   final Widget child;
-  final IconData? icon;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
+    final scheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
-      child: Card(
-        child: Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-                child: Row(
-                  children: [
-                    if (icon != null) ...[
-                      Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: scheme.primaryContainer,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(icon, size: 18, color: scheme.onPrimaryContainer),
-                      ),
-                      const SizedBox(width: 12),
-                    ],
-                    Expanded(
-                      child: Text(title,
-                          style: theme.textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w700)),
-                    ),
-                  ],
-                ),
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 7),
+            child: Text(
+              title.toUpperCase(),
+              style: TextStyle(
+                fontFamily: appFont,
+                fontSize: 12.5,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.3,
+                color: scheme.onSurfaceVariant,
               ),
-              child,
-            ],
+            ),
           ),
-        ),
+          Card(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: child,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -100,30 +90,16 @@ class _ThemeSection extends ConsumerWidget {
     final mode = ref.watch(themeModeProvider);
     return SettingsSection(
       title: context.s.appearance,
-      icon: Icons.palette_outlined,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
-        child: SegmentedButton<ThemeMode>(
-          segments: [
-            ButtonSegment(
-              value: ThemeMode.system,
-              label: Text(context.s.themeSystem),
-              icon: Icon(Icons.brightness_auto),
-            ),
-            ButtonSegment(
-              value: ThemeMode.light,
-              label: Text(context.s.themeLight),
-              icon: Icon(Icons.light_mode),
-            ),
-            ButtonSegment(
-              value: ThemeMode.dark,
-              label: Text(context.s.themeDark),
-              icon: Icon(Icons.dark_mode),
-            ),
-          ],
-          selected: {mode},
-          onSelectionChanged: (s) =>
-              ref.read(themeModeProvider.notifier).set(s.first),
+        child: IosSegmented<ThemeMode>(
+          segments: {
+            ThemeMode.system: (CupertinoIcons.circle_lefthalf_fill, context.s.themeSystem),
+            ThemeMode.light: (CupertinoIcons.sun_max_fill, context.s.themeLight),
+            ThemeMode.dark: (CupertinoIcons.moon_fill, context.s.themeDark),
+          },
+          value: mode,
+          onChanged: (m) => ref.read(themeModeProvider.notifier).set(m),
         ),
       ),
     );
@@ -138,22 +114,20 @@ class _LanguageSection extends ConsumerWidget {
     final current = ref.watch(languageProvider);
     return SettingsSection(
       title: context.s.languageTitle,
-      icon: Icons.translate,
-      child: RadioGroup<AppLanguage>(
-        groupValue: current,
-        onChanged: (l) {
-          if (l != null) ref.read(languageProvider.notifier).set(l);
-        },
-        child: Column(
-          children: [
-            for (final l in AppLanguage.values)
-              RadioListTile<AppLanguage>(
-                value: l,
-                secondary: Text(l.flag, style: const TextStyle(fontSize: 26)),
-                title: Text(l.nativeName),
-              ),
-          ],
-        ),
+      // An iOS choice list: a tick by the chosen row.
+      child: Column(
+        children: [
+          for (final l in AppLanguage.values)
+            ListTile(
+              leading: Text(l.flag, style: const TextStyle(fontSize: 26)),
+              title: Text(l.nativeName),
+              trailing: l == current
+                  ? Icon(CupertinoIcons.checkmark_alt,
+                      color: Theme.of(context).colorScheme.primary)
+                  : null,
+              onTap: () => ref.read(languageProvider.notifier).set(l),
+            ),
+        ],
       ),
     );
   }
@@ -168,10 +142,9 @@ class _RemindersSection extends ConsumerWidget {
     final notifier = ref.read(reminderProvider.notifier);
     return SettingsSection(
       title: context.s.reminders,
-      icon: Icons.notifications_none,
       child: Column(
         children: [
-          SwitchListTile(
+          IosSwitchTile(
             title: Text(context.s.dailyReminder),
             subtitle: Text(context.s.dailyReminderSubtitle),
             value: reminder.enabled,
@@ -184,10 +157,7 @@ class _RemindersSection extends ConsumerWidget {
             trailing: Text(reminder.time.format(context)),
             onTap: reminder.enabled
                 ? () async {
-                    final picked = await showTimePicker(
-                      context: context,
-                      initialTime: reminder.time,
-                    );
+                    final picked = await showIosTimePicker(context, reminder.time);
                     if (picked != null) {
                       await notifier.setTime(picked.hour, picked.minute);
                     }
@@ -208,7 +178,6 @@ class _LlmSection extends ConsumerWidget {
     final config = ref.watch(aiConfigProvider);
     return SettingsSection(
       title: context.s.aiProvider,
-      icon: Icons.auto_awesome_outlined,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: config == null
@@ -489,7 +458,7 @@ class _AiConnectFormState extends ConsumerState<_AiConnectForm> {
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CupertinoActivityIndicator(),
                     )
                   : const Icon(Icons.link),
               label: Text(_busy ? context.s.testing : context.s.testAndConnect),
@@ -626,30 +595,13 @@ class _AiConnectedState extends ConsumerState<_AiConnected> {
   }
 
   Future<void> _typeModel() async {
-    final controller = TextEditingController(text: widget.config.model);
-    final model = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(context.s.modelName),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          autocorrect: false,
-          onSubmitted: (v) => Navigator.of(context).pop(v),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text(context.s.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(controller.text),
-            child: Text(context.s.save),
-          ),
-        ],
-      ),
+    final model = await showIosPrompt(
+      context,
+      title: context.s.modelName,
+      initial: widget.config.model,
+      confirm: context.s.save,
+      autocorrect: false,
     );
-    controller.dispose();
     if (model != null && model.trim().isNotEmpty) {
       await ref.read(aiConfigProvider.notifier).setModel(model.trim());
     }
@@ -725,7 +677,7 @@ class _AiConnectedState extends ConsumerState<_AiConnected> {
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CupertinoActivityIndicator(),
                     )
                   : const Icon(Icons.refresh),
             ),
@@ -740,7 +692,7 @@ class _AiConnectedState extends ConsumerState<_AiConnected> {
                   ? const SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CupertinoActivityIndicator(),
                     )
                   : const Icon(Icons.network_check, size: 18),
               label: Text(
@@ -809,7 +761,7 @@ class _QuizPrepStatus extends ConsumerWidget {
                 const SizedBox(
                   width: 12,
                   height: 12,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                  child: CupertinoActivityIndicator(),
                 ),
                 const SizedBox(width: 8),
               ],
@@ -927,7 +879,6 @@ class _TelegramSectionState extends ConsumerState<_TelegramSection> {
 
     return SettingsSection(
       title: context.s.syncTelegram,
-      icon: Icons.cloud_sync_outlined,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16),
         child: attached
@@ -954,9 +905,7 @@ class _TelegramSectionState extends ConsumerState<_TelegramSection> {
                             ? const SizedBox(
                                 width: 16,
                                 height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
+                                child: CupertinoActivityIndicator(radius: 8),
                               )
                             : const Icon(Icons.sync),
                         label: Text(_status ?? context.s.syncNow),
@@ -1003,7 +952,7 @@ class _TelegramSectionState extends ConsumerState<_TelegramSection> {
                           ? const SizedBox(
                               width: 16,
                               height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child: CupertinoActivityIndicator(),
                             )
                           : const Icon(Icons.link),
                       label: Text(_status ?? context.s.attach),

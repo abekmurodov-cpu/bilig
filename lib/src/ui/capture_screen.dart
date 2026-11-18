@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -290,7 +291,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                       ? const SizedBox(
                           width: 16,
                           height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2))
+                          child: CupertinoActivityIndicator())
                       : const Icon(Icons.auto_awesome, size: 18),
                   label: Text(context.s.generateAnswer),
                 ),
@@ -362,7 +363,7 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
                   ? const SizedBox(
                       width: 18,
                       height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CupertinoActivityIndicator(),
                     )
                   : const Icon(Icons.check),
               label: Text(context.s.save),

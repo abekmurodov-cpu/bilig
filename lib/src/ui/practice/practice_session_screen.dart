@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -788,7 +789,7 @@ class _PracticeSessionScreenState
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const CircularProgressIndicator(),
+          const CupertinoActivityIndicator(),
           const SizedBox(height: 16),
           Text(context.s.preparingQuestions,
               style: Theme.of(context).textTheme.titleMedium),
@@ -889,7 +890,7 @@ class _PracticeSessionScreenState
   // --- Flashcard (Quizlet-style flip) ------------------------------------
   Widget _buildFlashcard() {
     final theme = Theme.of(context);
-    if (_preparing) return const Center(child: CircularProgressIndicator());
+    if (_preparing) return const Center(child: CupertinoActivityIndicator());
     final viewOnly = _index < _frontier;
     final pastGrade = _flashGrades[_index];
     final showGrades = !viewOnly && (_revealed || !_canReveal);
@@ -1018,7 +1019,7 @@ class _PracticeSessionScreenState
         _promptCard(context),
         Expanded(
           child: _preparing || _options == null
-              ? const Center(child: CircularProgressIndicator())
+              ? const Center(child: CupertinoActivityIndicator())
               : ListView(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   children: [
@@ -1090,7 +1091,7 @@ class _PracticeSessionScreenState
                         ? const SizedBox(
                             width: 18,
                             height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2))
+                            child: CupertinoActivityIndicator())
                         : Text(context.s.check),
                   ),
           ),
@@ -1207,7 +1208,7 @@ class _PracticeSessionScreenState
           onPressed: _explaining ? null : _explain,
           icon: _explaining
               ? const SizedBox(
-                  width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  width: 16, height: 16, child: CupertinoActivityIndicator())
               : const Icon(Icons.lightbulb_outline),
           label: Text(context.s.whyWrong),
         ),
@@ -1306,7 +1307,7 @@ class _PracticeSessionScreenState
                 ? const SizedBox(
                     width: 18,
                     height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2))
+                    child: CupertinoActivityIndicator())
                 : Text(context.s.check),
           )
         else ...[
@@ -1363,7 +1364,7 @@ class _PracticeSessionScreenState
 
   // --- Fill in the blank (inline tap-to-type) -----------------------------
   Widget _buildFillBlank() {
-    if (_preparing) return const Center(child: CircularProgressIndicator());
+    if (_preparing) return const Center(child: CupertinoActivityIndicator());
     final text = _textBlanks;
     if (text != null) return _buildTextBlanks(text);
     final answered = _wasCorrect != null;
@@ -1519,7 +1520,7 @@ class _PracticeSessionScreenState
 
   // --- Reorder the code ---------------------------------------------------
   Widget _buildReorder() {
-    if (_preparing) return const Center(child: CircularProgressIndicator());
+    if (_preparing) return const Center(child: CupertinoActivityIndicator());
     final answered = _wasCorrect != null;
     final segments = _item.reorderSegments;
     return Column(

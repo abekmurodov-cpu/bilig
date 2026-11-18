@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:record/record.dart';
@@ -12,6 +13,7 @@ import '../../l10n/app_strings.dart';
 import '../../llm/llm_provider.dart';
 import '../../llm/llm_providers.dart';
 import '../../providers/settings_providers.dart';
+import 'ios.dart';
 
 /// How speech becomes text.
 enum VoiceMode {
@@ -277,21 +279,13 @@ class _VoiceSheetState extends ConsumerState<VoiceSheet> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (_aiAvailable)
-            SegmentedButton<VoiceMode>(
-              segments: [
-                ButtonSegment(
-                    value: VoiceMode.device,
-                    icon: const Icon(Icons.phone_android),
-                    label: Text(strings.voiceDevice)),
-                ButtonSegment(
-                    value: VoiceMode.ai,
-                    icon: const Icon(Icons.auto_awesome),
-                    label: Text(strings.voiceAi)),
-              ],
-              selected: {_mode},
-              onSelectionChanged: _active || _transcribing
-                  ? null
-                  : (s) => _setMode(s.first),
+            IosSegmented<VoiceMode>(
+              segments: {
+                VoiceMode.device: (CupertinoIcons.device_phone_portrait, strings.voiceDevice),
+                VoiceMode.ai: (CupertinoIcons.sparkles, strings.voiceAi),
+              },
+              value: _mode,
+              onChanged: _active || _transcribing ? null : _setMode,
             ),
           if (_mode == VoiceMode.device && _locales.length > 1) ...[
             const SizedBox(height: 12),
@@ -313,7 +307,7 @@ class _VoiceSheetState extends ConsumerState<VoiceSheet> {
           Center(
             child: _transcribing
                 ? const SizedBox(
-                    width: 72, height: 72, child: CircularProgressIndicator())
+                    width: 72, height: 72, child: CupertinoActivityIndicator())
                 : IconButton.filled(
                     iconSize: 40,
                     style: IconButton.styleFrom(

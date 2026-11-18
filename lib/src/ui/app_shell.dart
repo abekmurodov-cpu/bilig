@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show ImageFilter;
 
 import 'package:desktop_drop/desktop_drop.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
@@ -26,8 +28,9 @@ import 'notes_screen.dart';
 import 'widgets/app_logo.dart';
 import 'practice/practice_screen.dart';
 import 'settings_screen.dart';
+import 'theme.dart';
 
-/// Top-level navigation: a persistent [NavigationBar] over four tabs. Each tab
+/// Top-level navigation: a persistent iOS tab bar over four tabs. Each tab
 /// hosts its own [Scaffold] (app bar / FAB), so screens keep their own chrome
 /// while sharing the bottom bar. Tab state is kept alive with an [IndexedStack].
 class AppShell extends ConsumerStatefulWidget {
@@ -156,8 +159,9 @@ class _AppShellState extends ConsumerState<AppShell> {
     );
   }
 
-  void _openCapture() => Navigator.of(context)
-      .push(MaterialPageRoute(builder: (_) => const CaptureScreen()));
+  /// A new note slides up as a sheet, like composing on iOS.
+  void _openCapture() => Navigator.of(context).push(MaterialPageRoute(
+      fullscreenDialog: true, builder: (_) => const CaptureScreen()));
 
   /// Files dropped on the window: a picture becomes notes, a notes file or
   /// deck is opened, and text is split into notes.
@@ -179,6 +183,8 @@ class _AppShellState extends ConsumerState<AppShell> {
 /// Wider than this (a Mac window, a tablet), the tabs move to a side rail.
 const double wideLayout = 840;
 
+/// The iOS tab bar: icons over small labels on a translucent strip with a
+/// hairline on top, the chosen tab in the brand colour.
 class _BottomBar extends ConsumerWidget {
   const _BottomBar({required this.tab, required this.onCapture});
 
@@ -187,54 +193,120 @@ class _BottomBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final scheme = Theme.of(context).colorScheme;
-    // The bar has Capture in the middle: it opens a screen, not a tab.
-    const capture = 2;
-    return NavigationBar(
-      selectedIndex: tab < capture ? tab : tab + 1,
-      onDestinationSelected: (i) {
-        if (i == capture) {
-          onCapture();
-        } else {
-          ref.read(shellTabProvider.notifier).go(i < capture ? i : i - 1);
-        }
-      },
-      destinations: [
-        NavigationDestination(
-          icon: const Icon(Icons.home_outlined),
-          selectedIcon: const Icon(Icons.home),
-          label: context.s.navHome,
-        ),
-        NavigationDestination(
-          icon: const Icon(Icons.park_outlined),
-          selectedIcon: const Icon(Icons.park),
-          label: context.s.navNotes,
-        ),
-        NavigationDestination(
-          icon: Container(
-            width: 52,
-            height: 36,
-            decoration: BoxDecoration(
-              color: scheme.primary,
-              borderRadius: BorderRadius.circular(14),
+    final strings = context.s;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final dark = theme.brightness == Brightness.dark;
+    void go(int i) {
+      if (i != tab) HapticFeedback.selectionClick();
+      ref.read(shellTabProvider.notifier).go(i);
+    }
+
+    Widget item(int i, IconData icon, IconData selectedIcon, String label) =>
+        _TabItem(
+          icon: i == tab ? selectedIcon : icon,
+          label: label,
+          color: i == tab ? scheme.primary : scheme.onSurfaceVariant.withValues(alpha: 0.85),
+          selected: i == tab,
+          onTap: () => go(i),
+        );
+
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: (dark ? scheme.surfaceContainer : scheme.surfaceContainerLowest)
+                .withValues(alpha: 0.92),
+            border: Border(
+              top: BorderSide(
+                  color: scheme.outlineVariant.withValues(alpha: dark ? 0.5 : 0.8),
+                  width: 0.5),
             ),
-            child: Icon(Icons.add, color: scheme.onPrimary),
           ),
-          label: context.s.capture,
+          child: SafeArea(
+            top: false,
+            child: SizedBox(
+              height: 54,
+              child: Row(
+                children: [
+                  item(0, CupertinoIcons.house, CupertinoIcons.house_fill, strings.navHome),
+                  item(1, CupertinoIcons.book, CupertinoIcons.book_fill, strings.navNotes),
+                  _TabItem(
+                    icon: CupertinoIcons.plus_circle_fill,
+                    iconSize: 34,
+                    label: strings.capture,
+                    color: scheme.primary,
+                    selected: false,
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      onCapture();
+                    },
+                  ),
+                  item(2, CupertinoIcons.bolt, CupertinoIcons.bolt_fill, strings.navPractice),
+                  item(3, CupertinoIcons.gear_alt, CupertinoIcons.gear_alt_fill,
+                      strings.navSettings),
+                ],
+              ),
+            ),
+          ),
         ),
-        NavigationDestination(
-          icon: const Icon(Icons.fitness_center_outlined),
-          selectedIcon: const Icon(Icons.fitness_center),
-          label: context.s.navPractice,
-        ),
-        NavigationDestination(
-          icon: const Icon(Icons.settings_outlined),
-          selectedIcon: const Icon(Icons.settings),
-          label: context.s.navSettings,
-        ),
-      ],
+      ),
     );
   }
+}
+
+class _TabItem extends StatelessWidget {
+  const _TabItem({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.selected,
+    required this.onTap,
+    this.iconSize = 25,
+  });
+
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool selected;
+  final VoidCallback onTap;
+  final double iconSize;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+        child: Semantics(
+          button: true,
+          selected: selected,
+          label: label,
+          excludeSemantics: true,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: onTap,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  height: 30,
+                  child: Center(child: Icon(icon, size: iconSize, color: color)),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: appFont,
+                    fontSize: 10.5,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
+                    color: color,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
 }
 
 /// The tabs down the side on wide screens, with Capture on top.
@@ -292,23 +364,23 @@ class _Rail extends ConsumerWidget {
       ),
       destinations: [
         NavigationRailDestination(
-          icon: const Icon(Icons.home_outlined),
-          selectedIcon: const Icon(Icons.home),
+          icon: const Icon(CupertinoIcons.house),
+          selectedIcon: const Icon(CupertinoIcons.house_fill),
           label: Text(strings.navHome),
         ),
         NavigationRailDestination(
-          icon: const Icon(Icons.park_outlined),
-          selectedIcon: const Icon(Icons.park),
+          icon: const Icon(CupertinoIcons.book),
+          selectedIcon: const Icon(CupertinoIcons.book_fill),
           label: Text(strings.navNotes),
         ),
         NavigationRailDestination(
-          icon: const Icon(Icons.fitness_center_outlined),
-          selectedIcon: const Icon(Icons.fitness_center),
+          icon: const Icon(CupertinoIcons.bolt),
+          selectedIcon: const Icon(CupertinoIcons.bolt_fill),
           label: Text(strings.navPractice),
         ),
         NavigationRailDestination(
-          icon: const Icon(Icons.settings_outlined),
-          selectedIcon: const Icon(Icons.settings),
+          icon: const Icon(CupertinoIcons.gear_alt),
+          selectedIcon: const Icon(CupertinoIcons.gear_alt_fill),
           label: Text(strings.navSettings),
         ),
       ],

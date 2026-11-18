@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -503,7 +504,7 @@ class _MarkerBar extends StatelessWidget {
                       ? const SizedBox(
                           width: 16,
                           height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2))
+                          child: CupertinoActivityIndicator())
                       : const Icon(Icons.auto_awesome, size: 18),
                   label: Text(context.s.suggestKeyIdeas),
                 ),
