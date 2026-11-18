@@ -68,6 +68,8 @@ void main() {
     await tester.drag(find.byType(SwipeCard), const Offset(400, 0));
     await settle(tester);
     expect(find.text('Capital of Japan?'), findsOneWidget, reason: 'not flipped yet');
+    expect(find.text(const AppStrings(AppLanguage.en).flipBeforeSwipe), findsOneWidget,
+        reason: 'says why the swipe did nothing');
 
     await tester.tap(find.byType(FlipCard));
     await tester.pump(const Duration(milliseconds: 500));

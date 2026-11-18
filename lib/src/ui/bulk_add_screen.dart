@@ -224,7 +224,9 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
             ),
         ],
       ),
-      body: ReadableWidth(child: drafts == null ? _buildInput() : _buildDrafts(drafts)),
+      body: ReadableBuilder(
+          builder: (context, gutter) =>
+              drafts == null ? _buildInput(gutter) : _buildDrafts(drafts, gutter)),
       bottomNavigationBar: drafts == null
           ? null
           : SafeArea(
@@ -240,14 +242,14 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
     );
   }
 
-  Widget _buildInput() {
+  Widget _buildInput(EdgeInsets gutter) {
     final strings = context.s;
     final theme = Theme.of(context);
     final llm = ref.watch(llmProvider);
     final canAi = llm != null && (!_isPhoto || llm.canReadImages);
     final ready = _isPhoto ? _image != null : _text.text.trim().isNotEmpty;
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16) + gutter,
       children: [
         if (_isPhoto) ...[
           if (_image != null)
@@ -320,13 +322,13 @@ class _BulkAddScreenState extends ConsumerState<BulkAddScreen> {
     );
   }
 
-  Widget _buildDrafts(List<NoteDraft> drafts) {
+  Widget _buildDrafts(List<NoteDraft> drafts, EdgeInsets gutter) {
     final strings = context.s;
     final theme = Theme.of(context);
     final all = _keep.length == drafts.length;
     // Built lazily: an imported deck can hold thousands of notes.
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24),
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 24) + gutter,
       itemCount: drafts.length + 2,
       itemBuilder: (context, i) {
         if (i == 0) {

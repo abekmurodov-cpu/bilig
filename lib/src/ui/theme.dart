@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 
 /// Bilig's indigo.
@@ -161,19 +162,94 @@ BoxDecoration practiceCardDecoration(BuildContext context) {
 
 /// Keeps content to a comfortable reading width on wide windows (a Mac, a
 /// tablet), centred; on a phone it changes nothing.
-class ReadableWidth extends StatelessWidget {
+///
+/// The empty margins beside it still scroll what's inside (mouse wheel and
+/// trackpad), so scrolling doesn't seem to stop working there. Plain lists
+/// should prefer [ReadableBuilder], which makes the list itself full-width.
+class ReadableWidth extends StatefulWidget {
   const ReadableWidth({super.key, required this.child, this.maxWidth = 760});
 
   final Widget child;
   final double maxWidth;
 
   @override
-  Widget build(BuildContext context) => Align(
-        alignment: Alignment.topCenter,
-        heightFactor: 1,
-        child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: maxWidth),
-          child: child,
-        ),
-      );
+  State<ReadableWidth> createState() => _ReadableWidthState();
+}
+
+class _ReadableWidthState extends State<ReadableWidth> {
+  final _content = GlobalKey();
+
+  /// The outermost vertical list inside, if any.
+  ScrollPosition? _scrollable() {
+    ScrollPosition? found;
+    void visit(Element e) {
+      if (found != null) return;
+      if (e is StatefulElement &&
+          e.state is ScrollableState &&
+          (e.state as ScrollableState).position.axis == Axis.vertical) {
+        found = (e.state as ScrollableState).position;
+        return;
+      }
+      e.visitChildren(visit);
+    }
+
+    _content.currentContext?.visitChildElements(visit);
+    return found;
+  }
+
+  void _scrollBy(double delta) {
+    final position = _scrollable();
+    if (position == null || delta == 0) return;
+    position.pointerScroll(delta);
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(builder: (context, box) {
+        final side = box.maxWidth.isFinite
+            ? ((box.maxWidth - widget.maxWidth) / 2).clamp(0.0, double.infinity)
+            : 0.0;
+        bool inMargin(Offset p) => p.dx < side || p.dx > box.maxWidth - side;
+        final content = Align(
+          alignment: Alignment.topCenter,
+          heightFactor: 1,
+          child: ConstrainedBox(
+            key: _content,
+            constraints: BoxConstraints(maxWidth: widget.maxWidth),
+            child: widget.child,
+          ),
+        );
+        if (side == 0) return content;
+        return Listener(
+          behavior: HitTestBehavior.translucent,
+          onPointerSignal: (e) {
+            if (e is PointerScrollEvent && inMargin(e.localPosition)) {
+              _scrollBy(e.scrollDelta.dy);
+            }
+          },
+          onPointerPanZoomUpdate: (e) {
+            // Trackpad: fingers up scroll down.
+            if (inMargin(e.localPosition)) _scrollBy(-e.panDelta.dy);
+          },
+          child: content,
+        );
+      });
+}
+
+/// For a list on a wide window: hands [builder] the side padding that keeps
+/// the list's content at a readable width in the middle, while the list
+/// itself spans the whole width, so scrolling works over the margins too and
+/// the scrollbar sits at the window's edge. On a phone the padding is zero.
+class ReadableBuilder extends StatelessWidget {
+  const ReadableBuilder({super.key, required this.builder, this.maxWidth = 760});
+
+  final Widget Function(BuildContext context, EdgeInsets gutter) builder;
+  final double maxWidth;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(builder: (context, box) {
+        final side = box.maxWidth.isFinite
+            ? ((box.maxWidth - maxWidth) / 2).clamp(0.0, double.infinity)
+            : 0.0;
+        return builder(context, EdgeInsets.symmetric(horizontal: side));
+      });
 }

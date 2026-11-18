@@ -887,6 +887,25 @@ class _PracticeSessionScreenState
   }
 
   // --- Flashcard (Quizlet-style flip) ------------------------------------
+  /// A swipe before the answer is shown: say to flip the card first.
+  void _flipFirstHint() {
+    HapticFeedback.lightImpact();
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(
+        content: Row(
+          children: [
+            Icon(Icons.touch_app_outlined,
+                color: Theme.of(context).colorScheme.onInverseSurface),
+            const SizedBox(width: 12),
+            Expanded(child: Text(context.s.flipBeforeSwipe)),
+          ],
+        ),
+        behavior: SnackBarBehavior.floating,
+        duration: const Duration(seconds: 2),
+      ));
+  }
+
   Widget _buildFlashcard() {
     final theme = Theme.of(context);
     if (_preparing) return const Center(child: CircularProgressIndicator());
@@ -907,6 +926,7 @@ class _PracticeSessionScreenState
                     SwipeCard(
                       key: ValueKey('swipe$_index'),
                       enabled: showGrades,
+                      onBlockedSwipe: viewOnly ? null : _flipFirstHint,
                       leftLabel: context.s.grade(ReviewGrade.again),
                       rightLabel: context.s.grade(ReviewGrade.good),
                       onSwipe: (direction) => _grade(direction == SwipeDirection.right

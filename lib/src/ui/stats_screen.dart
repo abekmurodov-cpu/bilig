@@ -30,8 +30,8 @@ class StatsScreen extends ConsumerWidget {
     final best = math.max(longestStreak(activity), streak);
     return Scaffold(
       appBar: AppBar(title: Text(strings.progress)),
-      body: ReadableWidth(maxWidth: 860, child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
+      body: ReadableBuilder(maxWidth: 860, builder: (context, gutter) => ListView(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32) + gutter,
         children: [
           Row(
             children: [

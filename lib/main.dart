@@ -9,6 +9,7 @@ import 'src/data/settings_repository.dart';
 import 'src/l10n/app_strings.dart';
 import 'src/notifications/notification_providers.dart';
 import 'src/notifications/notification_service.dart';
+import 'src/platform/due_signals.dart';
 import 'src/providers/knowledge_providers.dart';
 import 'src/providers/settings_providers.dart';
 import 'src/ui/app_shell.dart';
@@ -65,9 +66,38 @@ class BiligApp extends ConsumerWidget {
       themeMode: themeMode,
       theme: buildTheme(Brightness.light),
       darkTheme: buildTheme(Brightness.dark),
+      builder: (context, child) => _DockIcon(child: child!),
       home: ref.watch(onboardedProvider)
           ? const AppShell()
           : const OnboardingScreen(),
     );
   }
+}
+
+/// Keeps the Dock icon (macOS) dark or light with the app's theme, including
+/// when the theme follows the system and the system switches.
+class _DockIcon extends StatefulWidget {
+  const _DockIcon({required this.child});
+
+  final Widget child;
+
+  @override
+  State<_DockIcon> createState() => _DockIconState();
+}
+
+class _DockIconState extends State<_DockIcon> {
+  bool? _dark;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    if (dark != _dark) {
+      _dark = dark;
+      DueSignals.setDarkIcon(dark);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

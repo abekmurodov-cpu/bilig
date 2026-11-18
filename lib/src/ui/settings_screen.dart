@@ -24,8 +24,8 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       appBar: AppBar(title: Text(context.s.navSettings)),
-      body: ReadableWidth(child: ListView(
-        padding: const EdgeInsets.fromLTRB(0, 4, 0, 24),
+      body: ReadableBuilder(builder: (context, gutter) => ListView(
+        padding: const EdgeInsets.fromLTRB(0, 4, 0, 24) + gutter,
         children: [
           const _ThemeSection(),
           const _LanguageSection(),

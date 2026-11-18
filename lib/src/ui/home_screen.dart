@@ -47,7 +47,7 @@ class HomeScreen extends ConsumerWidget {
           const SizedBox(width: 4),
         ],
       ),
-      body: ReadableWidth(maxWidth: 860, child: itemsAsync.when(
+      body: itemsAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text(strings.somethingWentWrong(e))),
         data: (items) {
@@ -60,8 +60,8 @@ class HomeScreen extends ConsumerWidget {
                 ? b.lapses - a.lapses
                 : a.dueDate.compareTo(b.dueDate));
           void seeAll() => ref.read(shellTabProvider.notifier).go(ShellTab.notes);
-          return ListView(
-            padding: const EdgeInsets.only(bottom: 24),
+          return ReadableBuilder(maxWidth: 860, builder: (context, gutter) => ListView(
+            padding: const EdgeInsets.only(bottom: 24) + gutter,
             children: [
               const TodayCard(),
               const ExamCards(),
@@ -84,9 +84,9 @@ class HomeScreen extends ConsumerWidget {
               ),
               for (final n in recent) _tile(context, n),
             ],
-          );
+          ));
         },
-      )),
+      ),
     );
   }
 
@@ -156,28 +156,45 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-/// "🔥 7" when on a streak (a chart icon otherwise); opens Progress.
+/// The streak as a bare flame and number, like a game's top bar: orange
+/// once today's practice is done, grey until then. Opens Progress.
 class _StreakButton extends ConsumerWidget {
   const _StreakButton();
 
+  static const _flame = Color(0xFFFF9600);
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final streak = currentStreak(ref.watch(activityProvider));
-    void open() => Navigator.of(context)
-        .push(MaterialPageRoute(builder: (_) => const StatsScreen()));
-    if (streak == 0) {
-      return IconButton(
-        tooltip: context.s.progress,
-        icon: const Icon(Icons.insights_outlined),
-        onPressed: open,
-      );
-    }
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: ActionChip(
-        tooltip: context.s.progress,
-        label: Text('🔥 $streak'),
-        onPressed: open,
+    final activity = ref.watch(activityProvider);
+    final streak = currentStreak(activity);
+    final today = activity.containsKey(dayKey(DateTime.now()));
+    final color = today && streak > 0
+        ? _flame
+        : Theme.of(context).colorScheme.outline;
+    return Tooltip(
+      message: '${context.s.progress} · $streak ${context.s.dayStreak(streak)}',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => Navigator.of(context)
+            .push(MaterialPageRoute(builder: (_) => const StatsScreen())),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.local_fire_department_rounded, size: 28, color: color),
+              const SizedBox(width: 2),
+              Text(
+                '$streak',
+                style: TextStyle(
+                  color: color,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

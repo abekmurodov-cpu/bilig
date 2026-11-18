@@ -104,7 +104,9 @@ enum SwipeDirection { left, right }
 
 /// Lets the student swipe a card away: left for "Again", right for "Good".
 /// The card follows the finger, tilts, and shows which grade it will give.
-/// Swiping is off while [enabled] is false (before the answer is shown).
+/// Swiping is off while [enabled] is false (before the answer is shown):
+/// the card then only budges and springs back, and [onBlockedSwipe] tells
+/// the parent so it can say why (tap to flip first).
 class SwipeCard extends StatefulWidget {
   const SwipeCard({
     super.key,
@@ -113,11 +115,13 @@ class SwipeCard extends StatefulWidget {
     required this.onSwipe,
     required this.leftLabel,
     required this.rightLabel,
+    this.onBlockedSwipe,
   });
 
   final Widget child;
   final bool enabled;
   final ValueChanged<SwipeDirection> onSwipe;
+  final VoidCallback? onBlockedSwipe;
   final String leftLabel;
   final String rightLabel;
 
@@ -143,6 +147,13 @@ class _SwipeCardState extends State<SwipeCard>
     super.dispose();
   }
 
+  /// A swipe tried while swiping is off: spring back and report it.
+  void _endBlocked() {
+    if (_dx.abs() > 8) widget.onBlockedSwipe?.call();
+    _from = _dx;
+    _back.forward(from: 0);
+  }
+
   void _end(DragEndDetails details, double width) {
     final velocity = details.primaryVelocity ?? 0;
     final far = _dx.abs() > width * _threshold;
@@ -161,14 +172,24 @@ class _SwipeCardState extends State<SwipeCard>
   Widget build(BuildContext context) {
     return LayoutBuilder(builder: (context, constraints) {
       final width = constraints.maxWidth;
-      final progress = (_dx / (width * _threshold)).clamp(-1.0, 1.0);
+      final progress = widget.enabled
+          ? (_dx / (width * _threshold)).clamp(-1.0, 1.0)
+          : 0.0;
+      final blocked = !widget.enabled && widget.onBlockedSwipe != null;
       final label = progress > 0 ? widget.rightLabel : widget.leftLabel;
       final color = progress > 0 ? const Color(0xFF2E9E4F) : const Color(0xFFD64545);
       return GestureDetector(
         onHorizontalDragUpdate: widget.enabled
             ? (d) => setState(() => _dx += d.delta.dx)
-            : null,
-        onHorizontalDragEnd: widget.enabled ? (d) => _end(d, width) : null,
+            : blocked
+                // Stiff, so it feels held in place rather than broken.
+                ? (d) => setState(() => _dx = (_dx + d.delta.dx * 0.2).clamp(-24.0, 24.0))
+                : null,
+        onHorizontalDragEnd: widget.enabled
+            ? (d) => _end(d, width)
+            : blocked
+                ? (_) => _endBlocked()
+                : null,
         child: Transform.translate(
           offset: Offset(_dx, 0),
           child: Transform.rotate(

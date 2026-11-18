@@ -106,8 +106,8 @@ class _PracticeScreenState extends ConsumerState<PracticeScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(strings.navPractice)),
-      body: ReadableWidth(maxWidth: 900, child: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+      body: ReadableBuilder(maxWidth: 900, builder: (context, gutter) => ListView(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 24) + gutter,
         children: [
           heading(strings.method),
           grid(PracticeMethod.values.where((m) => !m.isCoding)),
