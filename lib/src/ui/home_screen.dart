@@ -63,7 +63,7 @@ class HomeScreen extends ConsumerWidget {
                 : a.dueDate.compareTo(b.dueDate));
           void seeAll() => ref.read(shellTabProvider.notifier).go(ShellTab.notes);
           return ListView(
-            padding: const EdgeInsets.only(bottom: 24),
+            padding: EdgeInsets.only(bottom: 24 + MediaQuery.paddingOf(context).bottom),
             children: [
               const TodayCard(),
               const ExamCards(),

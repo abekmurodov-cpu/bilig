@@ -12,10 +12,10 @@ const String appFont = 'Inter';
 const String paperFont = 'SourceSerif';
 
 /// Corner radius of cards, sheets and grouped sections.
-const double cardRadius = 18;
+const double cardRadius = 22;
 
 /// Corner radius of fields and buttons.
-const double controlRadius = 14;
+const double controlRadius = 16;
 
 /// The app's look: quiet tinted surfaces instead of shadows, rounded cards,
 /// filled fields, firm headings and roomy buttons.
@@ -135,7 +135,7 @@ ThemeData buildTheme(Brightness brightness) {
     bottomSheetTheme: const BottomSheetThemeData(
       showDragHandle: true,
       shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(28))),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32))),
     ),
     dialogTheme: DialogThemeData(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),

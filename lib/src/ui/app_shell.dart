@@ -153,7 +153,12 @@ class _AppShellState extends ConsumerState<AppShell> {
                     ],
                   ),
                 )
-              : Scaffold(body: stack, bottomNavigationBar: _BottomBar(tab: tab, onCapture: _openCapture)),
+              : Scaffold(
+                  // The tab bar floats: content scrolls on under it.
+                  extendBody: true,
+                  body: stack,
+                  bottomNavigationBar: _BottomBar(tab: tab, onCapture: _openCapture),
+                ),
         ),
       ),
     );
@@ -183,72 +188,157 @@ class _AppShellState extends ConsumerState<AppShell> {
 /// Wider than this (a Mac window, a tablet), the tabs move to a side rail.
 const double wideLayout = 840;
 
-/// The iOS tab bar: icons over small labels on a translucent strip with a
-/// hairline on top, the chosen tab in the brand colour.
+/// The floating iOS tab bar: a rounded glass capsule over the content with a
+/// highlight that slides to the chosen tab, and a round Capture button
+/// beside it.
 class _BottomBar extends ConsumerWidget {
   const _BottomBar({required this.tab, required this.onCapture});
 
   final int tab;
   final VoidCallback onCapture;
 
+  static const double height = 64;
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final strings = context.s;
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final dark = theme.brightness == Brightness.dark;
-    void go(int i) {
-      if (i != tab) HapticFeedback.selectionClick();
-      ref.read(shellTabProvider.notifier).go(i);
-    }
-
-    Widget item(int i, IconData icon, IconData selectedIcon, String label) =>
-        _TabItem(
-          icon: i == tab ? selectedIcon : icon,
-          label: label,
-          color: i == tab ? scheme.primary : scheme.onSurfaceVariant.withValues(alpha: 0.85),
-          selected: i == tab,
-          onTap: () => go(i),
-        );
-
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            color: (dark ? scheme.surfaceContainer : scheme.surfaceContainerLowest)
-                .withValues(alpha: 0.92),
-            border: Border(
-              top: BorderSide(
-                  color: scheme.outlineVariant.withValues(alpha: dark ? 0.5 : 0.8),
-                  width: 0.5),
-            ),
-          ),
-          child: SafeArea(
-            top: false,
-            child: SizedBox(
-              height: 54,
-              child: Row(
-                children: [
-                  item(0, CupertinoIcons.house, CupertinoIcons.house_fill, strings.navHome),
-                  item(1, CupertinoIcons.book, CupertinoIcons.book_fill, strings.navNotes),
-                  _TabItem(
-                    icon: CupertinoIcons.plus_circle_fill,
-                    iconSize: 34,
-                    label: strings.capture,
-                    color: scheme.primary,
-                    selected: false,
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      onCapture();
-                    },
-                  ),
-                  item(2, CupertinoIcons.bolt, CupertinoIcons.bolt_fill, strings.navPractice),
-                  item(3, CupertinoIcons.gear_alt, CupertinoIcons.gear_alt_fill,
-                      strings.navSettings),
-                ],
+    final scheme = Theme.of(context).colorScheme;
+    final tabs = [
+      (CupertinoIcons.house, CupertinoIcons.house_fill, strings.navHome),
+      (CupertinoIcons.book, CupertinoIcons.book_fill, strings.navNotes),
+      (CupertinoIcons.bolt, CupertinoIcons.bolt_fill, strings.navPractice),
+      (CupertinoIcons.gear_alt, CupertinoIcons.gear_alt_fill, strings.navSettings),
+    ];
+    final bottom = MediaQuery.paddingOf(context).bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 0, 16, bottom > 0 ? bottom : 14),
+      child: SizedBox(
+        height: height,
+        child: Row(
+          children: [
+            Expanded(
+              child: _Glass(
+                child: LayoutBuilder(
+                  builder: (context, box) {
+                    final width = (box.maxWidth - 8) / tabs.length;
+                    return Stack(
+                      children: [
+                        AnimatedPositioned(
+                          duration: const Duration(milliseconds: 320),
+                          curve: Curves.easeOutBack,
+                          left: 4 + tab * width,
+                          top: 4,
+                          bottom: 4,
+                          width: width,
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: scheme.primary.withValues(alpha: 0.13),
+                              borderRadius: BorderRadius.circular(height / 2),
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          child: Row(
+                            children: [
+                              for (var i = 0; i < tabs.length; i++)
+                                _TabItem(
+                                  icon: i == tab ? tabs[i].$2 : tabs[i].$1,
+                                  label: tabs[i].$3,
+                                  color: i == tab ? scheme.primary : scheme.onSurface,
+                                  selected: i == tab,
+                                  onTap: () {
+                                    if (i != tab) HapticFeedback.selectionClick();
+                                    ref.read(shellTabProvider.notifier).go(i);
+                                  },
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ),
             ),
+            const SizedBox(width: 10),
+            Tooltip(
+              message: strings.capture,
+              child: Semantics(
+                button: true,
+                label: strings.capture,
+                excludeSemantics: true,
+                child: GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    onCapture();
+                  },
+                  child: Container(
+                    width: height,
+                    height: height,
+                    decoration: BoxDecoration(
+                      color: scheme.primary,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: scheme.primary.withValues(alpha: 0.35),
+                          blurRadius: 18,
+                          offset: const Offset(0, 6),
+                        ),
+                      ],
+                    ),
+                    child: Icon(CupertinoIcons.add, size: 30, color: scheme.onPrimary),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Frosted glass: blurs what scrolls underneath, with a soft shadow and a
+/// thin light rim.
+class _Glass extends StatelessWidget {
+  const _Glass({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final shape = BorderRadius.circular(_BottomBar.height / 2);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: shape,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: dark ? 0.4 : 0.1),
+            blurRadius: 24,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: shape,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 22, sigmaY: 22),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: (dark ? scheme.surfaceContainerHigh : Colors.white)
+                  .withValues(alpha: dark ? 0.72 : 0.78),
+              borderRadius: shape,
+              border: Border.all(
+                color: dark
+                    ? Colors.white.withValues(alpha: 0.12)
+                    : scheme.outlineVariant.withValues(alpha: 0.5),
+                width: 0.7,
+              ),
+            ),
+            child: child,
           ),
         ),
       ),
@@ -263,7 +353,6 @@ class _TabItem extends StatelessWidget {
     required this.color,
     required this.selected,
     required this.onTap,
-    this.iconSize = 25,
   });
 
   final IconData icon;
@@ -271,7 +360,6 @@ class _TabItem extends StatelessWidget {
   final Color color;
   final bool selected;
   final VoidCallback onTap;
-  final double iconSize;
 
   @override
   Widget build(BuildContext context) => Expanded(
@@ -286,11 +374,8 @@ class _TabItem extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                SizedBox(
-                  height: 30,
-                  child: Center(child: Icon(icon, size: iconSize, color: color)),
-                ),
-                const SizedBox(height: 2),
+                Icon(icon, size: 23, color: color),
+                const SizedBox(height: 3),
                 Text(
                   label,
                   maxLines: 1,

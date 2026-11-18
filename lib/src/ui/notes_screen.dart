@@ -326,7 +326,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     final hasMore = count < notes.length;
     return ListView.separated(
       controller: _scrollController,
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+      padding: EdgeInsets.fromLTRB(16, 8, 16, 24 + MediaQuery.paddingOf(context).bottom),
       itemCount: header + count + (hasMore ? 1 : 0),
       separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (context, i) {
@@ -372,7 +372,7 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     }
     final entries = groups.entries.toList();
     return ListView(
-      padding: const EdgeInsets.only(bottom: 24),
+      padding: EdgeInsets.only(bottom: 24 + MediaQuery.paddingOf(context).bottom),
       children: [
         const _TreeLegend(),
         for (final entry in entries)
