@@ -44,7 +44,11 @@ class IosSegmented<T extends Object> extends StatelessWidget {
     required this.segments,
     required this.value,
     required this.onChanged,
+    this.expand = true,
   });
+
+  /// Fills the width; off for a compact control in a toolbar.
+  final bool expand;
 
   /// Each value's label, optionally with an icon.
   final Map<T, (IconData?, String)> segments;
@@ -60,7 +64,7 @@ class IosSegmented<T extends Object> extends StatelessWidget {
       child: IgnorePointer(
         ignoring: onChanged == null,
         child: SizedBox(
-          width: double.infinity,
+          width: expand ? double.infinity : null,
           child: CupertinoSlidingSegmentedControl<T>(
             groupValue: value,
             backgroundColor: scheme.surfaceContainerHighest,

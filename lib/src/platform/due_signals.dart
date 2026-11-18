@@ -38,6 +38,18 @@ class DueSignals {
     }
   }
 
+  /// A dark or light Dock icon to match the app's theme (macOS).
+  static Future<void> setDarkIcon(bool dark) async {
+    if (!_mac) return;
+    try {
+      await _badge.invokeMethod('icon', dark);
+    } on MissingPluginException {
+      // Not available here (tests).
+    } on PlatformException {
+      // A nicety; never let it break the app.
+    }
+  }
+
   static Future<void> _updateWidget(
       List<KnowledgeItem> notes, AppStrings strings, DateTime now) async {
     final limit = now.add(_horizon);

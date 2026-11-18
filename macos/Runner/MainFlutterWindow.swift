@@ -11,17 +11,24 @@ class MainFlutterWindow: NSWindow {
     RegisterGeneratedPlugins(registry: flutterViewController)
     ShareBridge.shared.attach(to: flutterViewController)
 
-    // How many notes are due, as a badge on the Dock icon.
+    // The Dock icon: how many notes are due as a badge ("set"), and a dark
+    // or light icon to match the app's theme ("icon").
     FlutterMethodChannel(
       name: "bilig/badge", binaryMessenger: flutterViewController.engine.binaryMessenger
     ).setMethodCallHandler { call, result in
-      guard call.method == "set" else {
+      switch call.method {
+      case "set":
+        let count = call.arguments as? Int ?? 0
+        NSApp.dockTile.badgeLabel = count > 0 ? "\(count)" : nil
+        result(nil)
+      case "icon":
+        let dark = call.arguments as? Bool ?? false
+        // nil goes back to the bundle's (light) icon.
+        NSApp.applicationIconImage = dark ? NSImage(named: "AppIconDark") : nil
+        result(nil)
+      default:
         result(FlutterMethodNotImplemented)
-        return
       }
-      let count = call.arguments as? Int ?? 0
-      NSApp.dockTile.badgeLabel = count > 0 ? "\(count)" : nil
-      result(nil)
     }
 
     super.awakeFromNib()

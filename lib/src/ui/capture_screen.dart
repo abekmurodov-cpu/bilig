@@ -211,10 +211,10 @@ class _CaptureScreenState extends ConsumerState<CaptureScreen> {
     final aiAttached = ref.watch(llmProvider) != null;
     return Scaffold(
       appBar: AppBar(title: Text(context.s.captureTitle)),
-      body: ReadableWidth(child: Form(
+      body: Form(
         key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
+        child: ReadableBuilder(builder: (context, gutter) => ListView(
+          padding: const EdgeInsets.all(16) + gutter,
           children: [
             Wrap(
               spacing: 8,

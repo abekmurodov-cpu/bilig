@@ -69,7 +69,7 @@ class AppStrings {
   String get done => _t('Done', 'Tayyor', 'Готово');
   String get attach => _t('Attach', 'Ulash', 'Подключить');
   String get detach => _t('Detach', 'Uzish', 'Отключить');
-  String get prompt => _t('Prompt', 'Savol', 'Вопрос');
+  String get prompt => _t('Note', 'Savol', 'Вопрос');
   String get answerDetails =>
       _t('Answer / details', 'Javob / tafsilotlar', 'Ответ / подробности');
   String get category => _t('Category', 'Turkum', 'Категория');
@@ -83,7 +83,7 @@ class AppStrings {
       'Nimadir noto‘g‘ri ketdi:\n$e', 'Что-то пошло не так:\n$e');
 
   // --- Home --------------------------------------------------------------
-  String get capture => _t('Capture', 'Qo‘shish', 'Добавить');
+  String get capture => _t('Add', 'Qo‘shish', 'Добавить');
   String get review => _t('Review', 'Takrorlash', 'Повторить');
   String readyToChallenge(int n) => _t(
         '$n ${n == 1 ? 'item' : 'items'} ready to challenge you',
@@ -93,7 +93,7 @@ class AppStrings {
   String get emptyTitle => _t('Your notes will hit back.',
       'Qaydlaringiz sizni sinaydi.', 'Ваши заметки будут вас проверять.');
   String get emptyBody => _t(
-        'Capture a fact, a concept, a command, or a question. '
+        'Add a fact, a concept, a command, or a question. '
             'The app will quiz you on it later so you never forget.',
         'Fakt, tushuncha, buyruq yoki savolni yozib qo‘ying. '
             'Ilova keyinroq sizni shu bo‘yicha sinaydi va siz hech narsani '
@@ -105,6 +105,8 @@ class AppStrings {
   // --- Notes / tree ------------------------------------------------------
   String get viewList => _t('List', 'Ro‘yxat', 'Список');
   String get viewTree => _t('Tree', 'Daraxt', 'Дерево');
+  String get viewTrees => _t('Trees', 'Daraxtlar', 'Деревья');
+  String get read => _t('Read', 'O‘qish', 'Читать');
   String searchNotesCount(int n) => _t('Search $n notes', '$n ta qaydni qidirish',
       'Поиск по заметкам: $n');
   String foundNotes(int n) =>
@@ -134,7 +136,7 @@ class AppStrings {
   String get legendNeedsTraining =>
       _t('Needs training', 'Takrorlash kerak', 'Нужно повторить');
   String get noNotes => _t(
-        'No notes yet. Capture some and watch them grow.',
+        'No notes yet. Add some and watch them grow.',
         'Hozircha qaydlar yo‘q. Bir nechtasini yozing va ularning '
             'o‘sishini kuzating.',
         'Заметок пока нет. Добавьте несколько и смотрите, как они растут.',
@@ -147,7 +149,7 @@ class AppStrings {
 
   // --- Capture -----------------------------------------------------------
   String get captureTitle =>
-      _t('Capture knowledge', 'Bilim qo‘shish', 'Добавить знание');
+      _t('Take a note', 'Bilim qo‘shish', 'Добавить знание');
   String get whatKind =>
       _t('What kind of thing is this?', 'Bu qanday ma’lumot?', 'Что это за запись?');
   String get promptHint => _t(
@@ -570,6 +572,9 @@ class AppStrings {
   // --- Easier to use --------------------------------------------------------
   String get undoGrade => _t('Undo last grade', 'Oxirgi bahoni bekor qilish',
       'Отменить последнюю оценку');
+  String get flipBeforeSwipe => _t('Tap the card to see the answer first, then swipe',
+      'Avval kartani bosib javobni ko‘ring, keyin suring',
+      'Сначала нажмите на карточку, чтобы увидеть ответ, затем смахните');
   String get swipeHint => _t('Swipe ← Again · Good →', 'Suring: ← Yana · Yaxshi →',
       'Смахните: ← Снова · Хорошо →');
   String get keyboardHint => _t('Space flip · 1–4 grade · ←/→ browse · ⌘Z undo',

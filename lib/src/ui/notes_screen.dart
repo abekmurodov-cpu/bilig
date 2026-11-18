@@ -7,6 +7,7 @@ import '../models/knowledge_item.dart';
 import '../models/note_search.dart';
 import '../providers/knowledge_providers.dart';
 import '../providers/navigation.dart';
+import 'note_paper_screen.dart';
 import 'theme.dart';
 import 'widgets/category_field.dart';
 import 'widgets/category_tree.dart';
@@ -104,6 +105,16 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
     showUndoDelete(messenger, strings, store, deleted);
   }
 
+  /// The one category (or topic) chosen in the filter, to read as a page.
+  ({String category, String? topic})? _readable() {
+    if (_categories.length != 1) return null;
+    final parts = _categories.first.split('\u001f');
+    return (
+      category: parts.first.isEmpty ? kUngroupedCategory : parts.first,
+      topic: parts.length > 1 ? parts[1] : null,
+    );
+  }
+
   bool get _filtering =>
       _search.text.trim().isNotEmpty || _tags.isNotEmpty || _categories.isNotEmpty;
 
@@ -198,13 +209,17 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
         context,
         title: Text(strings.navNotes),
         actions: [
-          IconButton(
-            tooltip: _view == _NotesView.list ? strings.viewTree : strings.viewList,
-            icon: Icon(_view == _NotesView.list ? Icons.park_outlined : Icons.view_agenda_outlined),
-            onPressed: () => setState(() => _view =
-                _view == _NotesView.list ? _NotesView.tree : _NotesView.list),
+          // List or trees, both always in sight so the trees are found.
+          IosSegmented<_NotesView>(
+            expand: false,
+            segments: {
+              _NotesView.list: (CupertinoIcons.list_bullet, strings.viewList),
+              _NotesView.tree: (CupertinoIcons.tree, strings.viewTrees),
+            },
+            value: _view,
+            onChanged: (v) => setState(() => _view = v),
           ),
-          const SizedBox(width: 4),
+          const SizedBox(width: 12),
         ],
         bottom: PreferredSize(
           preferredSize: Size.fromHeight(showFilters ? 112 : 64),
@@ -331,11 +346,29 @@ class _NotesScreenState extends ConsumerState<NotesScreen> {
       separatorBuilder: (_, _) => const SizedBox(height: 8),
       itemBuilder: (context, i) {
         if (i < header) {
+          final readable = _readable();
           return Padding(
             padding: const EdgeInsets.only(left: 4),
-            child: Text(context.s.foundNotes(notes.length),
-                style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(context.s.foundNotes(notes.length),
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                ),
+                // One category or topic chosen: read it all as one page.
+                if (readable != null)
+                  FilledButton.tonalIcon(
+                    style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                    onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                      builder: (_) => NotePaperScreen(
+                          category: readable.category, topic: readable.topic),
+                    )),
+                    icon: const Icon(Icons.menu_book_outlined, size: 18),
+                    label: Text(context.s.readAsPage),
+                  ),
+              ],
+            ),
           );
         }
         i -= header;

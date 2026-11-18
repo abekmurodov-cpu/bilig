@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_strings.dart';
 import '../../models/knowledge_item.dart';
 import '../../providers/knowledge_providers.dart';
+import '../note_paper_screen.dart';
 import 'category_sheet.dart';
 import 'share_category.dart';
 import 'tree_model.dart';
@@ -159,6 +160,14 @@ class CategoryTree extends StatelessWidget {
                       ),
                     ),
                   ),
+                ),
+                TextButton.icon(
+                  style: const ButtonStyle(visualDensity: VisualDensity.compact),
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => NotePaperScreen(category: category),
+                  )),
+                  icon: const Icon(Icons.menu_book_outlined, size: 18),
+                  label: Text(context.s.read),
                 ),
                 IconButton(
                   tooltip: context.s.shareCategory,
