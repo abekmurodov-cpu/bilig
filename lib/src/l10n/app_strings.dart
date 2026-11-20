@@ -686,6 +686,8 @@ class AppStrings {
         'До экзамена повторения этой категории приходят чуть чаще и всегда до его дня, чтобы всё успеть освежить.',
       );
   String get pickExamDate => _t('Pick the date', 'Sanani tanlang', 'Выберите дату');
+  String get editExam =>
+      _t('Change exam date', 'Imtihon sanasini o‘zgartirish', 'Изменить дату экзамена');
   String get removeExam => _t('Remove exam', 'Imtihonni olib tashlash', 'Убрать экзамен');
   String get examNeedsCategory => _t('Give your notes a category first.',
       'Avval qaydlaringizga turkum bering.', 'Сначала задайте заметкам категорию.');
