@@ -295,14 +295,18 @@ class _ExamCard extends ConsumerWidget {
         final r = rank(a) - rank(b);
         return r != 0 ? r : a.dueDate.compareTo(b.dueDate);
       });
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 6, 12, 2),
-      padding: const EdgeInsets.fromLTRB(16, 12, 8, 12),
-      decoration: BoxDecoration(
+    // Tapping the card (or the pencil) changes or removes the exam date.
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 6, 12, 2),
+      child: Material(
         color: theme.colorScheme.tertiaryContainer.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(18),
-      ),
-      child: Row(
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () => showExamDialog(context, ref, category: category),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
+            child: Row(
         children: [
           Icon(Icons.event, color: theme.colorScheme.onTertiaryContainer),
           const SizedBox(width: 12),
@@ -332,15 +336,32 @@ class _ExamCard extends ConsumerWidget {
                     scope: PracticeScope.category, category: category),
             child: Text(strings.study),
           ),
+          IconButton(
+            tooltip: strings.editExam,
+            icon: const Icon(Icons.edit_calendar_outlined),
+            onPressed: () => showExamDialog(context, ref, category: category),
+          ),
         ],
+      ),
+          ),
+        ),
       ),
     );
   }
 }
 
-/// Picks a category and an exam date (or removes the exam).
-Future<void> showExamDialog(BuildContext context, WidgetRef ref) async {
-  final categories = ref.read(categoriesProvider);
+/// Picks a category and an exam date, or changes or removes one already set.
+/// Opens on [category] when given (an exam card), else on the soonest exam
+/// already set, else on the first category.
+Future<void> showExamDialog(BuildContext context, WidgetRef ref,
+    {String? category}) async {
+  final exams = ref.read(examsProvider);
+  // Categories with an exam stay pickable even if their notes moved away.
+  final categories = {
+    ...ref.read(categoriesProvider),
+    ...exams.keys,
+    ?category,
+  }.toList();
   if (categories.isEmpty) {
     ScaffoldMessenger.of(context)
         .showSnackBar(SnackBar(content: Text(context.s.examNeedsCategory)));
@@ -348,21 +369,32 @@ Future<void> showExamDialog(BuildContext context, WidgetRef ref) async {
   }
   await showDialog<void>(
     context: context,
-    builder: (_) => _ExamDialog(categories: categories),
+    builder: (_) => _ExamDialog(
+      categories: categories,
+      initial: category ?? _soonestExam(exams) ?? categories.first,
+    ),
   );
 }
 
+String? _soonestExam(Map<String, DateTime> exams) {
+  final today = DateUtils.dateOnly(DateTime.now());
+  final ahead = [for (final e in exams.entries) if (!e.value.isBefore(today)) e]
+    ..sort((a, b) => a.value.compareTo(b.value));
+  return ahead.isEmpty ? null : ahead.first.key;
+}
+
 class _ExamDialog extends ConsumerStatefulWidget {
-  const _ExamDialog({required this.categories});
+  const _ExamDialog({required this.categories, required this.initial});
 
   final List<String> categories;
+  final String initial;
 
   @override
   ConsumerState<_ExamDialog> createState() => _ExamDialogState();
 }
 
 class _ExamDialogState extends ConsumerState<_ExamDialog> {
-  late String _category = widget.categories.first;
+  late String _category = widget.initial;
   DateTime? _date;
 
   @override
@@ -372,12 +404,18 @@ class _ExamDialogState extends ConsumerState<_ExamDialog> {
   }
 
   Future<void> _pickDate() async {
-    final now = DateTime.now();
+    final today = DateUtils.dateOnly(DateTime.now());
+    final current = _date;
     final picked = await showDatePicker(
       context: context,
-      initialDate: _date ?? now.add(const Duration(days: 14)),
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 730)),
+      // A date already passed can't be offered; start from today then.
+      initialDate: current == null
+          ? today.add(const Duration(days: 14))
+          : current.isBefore(today)
+              ? today
+              : current,
+      firstDate: today,
+      lastDate: today.add(const Duration(days: 730)),
     );
     if (picked != null) setState(() => _date = picked);
   }
@@ -385,7 +423,8 @@ class _ExamDialogState extends ConsumerState<_ExamDialog> {
   @override
   Widget build(BuildContext context) {
     final strings = context.s;
-    final existing = ref.watch(examsProvider)[_category];
+    final exams = ref.watch(examsProvider);
+    final existing = exams[_category];
     final localizations = MaterialLocalizations.of(context);
     return AlertDialog(
       title: Text(strings.examMode),
@@ -402,7 +441,12 @@ class _ExamDialogState extends ConsumerState<_ExamDialog> {
                 labelText: strings.category),
             items: [
               for (final c in widget.categories)
-                DropdownMenuItem(value: c, child: Text(c)),
+                DropdownMenuItem(
+                  value: c,
+                  child: Text(exams[c] == null
+                      ? c
+                      : '$c · ${localizations.formatMediumDate(exams[c]!)}'),
+                ),
             ],
             onChanged: (c) => setState(() {
               _category = c!;
@@ -422,6 +466,8 @@ class _ExamDialogState extends ConsumerState<_ExamDialog> {
       actions: [
         if (existing != null)
           TextButton(
+            style: TextButton.styleFrom(
+                foregroundColor: Theme.of(context).colorScheme.error),
             onPressed: () async {
               await ref.read(examsProvider.notifier).set(_category, null);
               if (context.mounted) Navigator.pop(context);
